@@ -1,7 +1,7 @@
 #![no_std]
 use soroban_sdk::{
-  contract, contracterror, contractimpl, contracttype, log, symbol_short, vec, Env, String, Symbol,
-  Vec,
+  contract, contracterror, contractimpl, contracttype, log, panic_with_error, symbol_short, vec,
+  Env, String, Symbol, Vec,
 };
 
 #[contracterror]
@@ -30,7 +30,7 @@ impl Contract {
   }
   pub fn increment(env: Env, incr: u32) -> Result<u32, Error> {
     let mut state = Self::get_state(env.clone());
-    log!(&env, "state: {}", state);
+    log!(&env, "increment: {}", state);
     state.count += incr;
     state.last_incr = incr;
     if state.count <= MAX_COUNT {
@@ -41,16 +41,24 @@ impl Contract {
       Err(Error::LimitReached)
     }
   }
-
-  pub fn reset_count(env: Env, value: u32) -> u32 {
+  pub fn debugging(env: Env, value: u32) -> u32 {
+    match value {
+      0 => 0,
+      _ => {
+        log!(&env, "fail");
+        panic_with_error!(&env, Error::LimitReached);
+      }
+    }
+  }
+  pub fn reset_count(env: Env, value: u32) -> Result<u32, Error> {
     let mut state = Self::get_state(env.clone());
-    log!(&env, "state: {}", state);
+    log!(&env, "reset_count: {}", state);
 
     state.count = value;
     state.last_incr = value;
     env.storage().instance().set(&STATE, &state);
     env.storage().instance().extend_ttl(50, 100);
-    state.count
+    Ok(state.count)
   }
   pub fn get_state(env: Env) -> State {
     env.storage().instance().get(&STATE).unwrap_or(State {
