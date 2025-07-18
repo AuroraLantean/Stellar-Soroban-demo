@@ -19,12 +19,12 @@ fn test() {
     ]
   );
 
-  assert_eq!(client.increment(), 1);
-  assert_eq!(client.increment(), 2);
-  let count = client.get_count();
-  assert_eq!(count, 2);
+  assert_eq!(client.increment(&3), 3);
+  assert_eq!(client.increment(&2), 5);
+  let state = client.get_state();
+  assert_eq!(state.count, 5);
 
   assert_eq!(client.reset_count(&99), 99);
-  let count = client.get_count();
-  assert_eq!(count, 99);
+  let state = client.get_state();
+  assert_eq!(state.count, 99);
 }
