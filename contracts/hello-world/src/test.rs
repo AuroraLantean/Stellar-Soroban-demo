@@ -18,4 +18,13 @@ fn test() {
       String::from_str(&env, "John Doe"),
     ]
   );
+
+  assert_eq!(client.increment(), 1);
+  assert_eq!(client.increment(), 2);
+  let count = client.get_count();
+  assert_eq!(count, 2);
+
+  assert_eq!(client.reset_count(&99), 99);
+  let count = client.get_count();
+  assert_eq!(count, 99);
 }
