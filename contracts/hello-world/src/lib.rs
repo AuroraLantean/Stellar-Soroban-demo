@@ -1,8 +1,15 @@
 #![no_std]
 use soroban_sdk::{
-  contract, contractimpl, contracttype, log, symbol_short, vec, Env, String, Symbol, Vec,
+  contract, contracterror, contractimpl, contracttype, log, symbol_short, vec, Env, String, Symbol,
+  Vec,
 };
 
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum Error {
+  LimitReached = 1,
+}
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct State {
@@ -10,7 +17,7 @@ pub struct State {
   pub last_incr: u32,
 }
 const STATE: Symbol = symbol_short!("STATE");
-
+const MAX_COUNT: u32 = 5;
 #[contract]
 pub struct Contract;
 
@@ -21,15 +28,18 @@ impl Contract {
     log!(&env, "Name: {}. time: {}", name, time);
     vec![&env, String::from_str(&env, "Hello"), name]
   }
-  pub fn increment(env: Env, incr: u32) -> u32 {
+  pub fn increment(env: Env, incr: u32) -> Result<u32, Error> {
     let mut state = Self::get_state(env.clone());
     log!(&env, "state: {}", state);
     state.count += incr;
     state.last_incr = incr;
-
-    env.storage().instance().set(&STATE, &state);
-    env.storage().instance().extend_ttl(50, 100);
-    state.count
+    if state.count <= MAX_COUNT {
+      env.storage().instance().set(&STATE, &state);
+      env.storage().instance().extend_ttl(50, 100);
+      Ok(state.count)
+    } else {
+      Err(Error::LimitReached)
+    }
   }
 
   pub fn reset_count(env: Env, value: u32) -> u32 {
