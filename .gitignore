@@ -18,7 +18,7 @@ dist/
 #Stellar Soroban
 .soroban
 .stellar
-
+contracts/hello-world/test_snapshots
 aarchives
 examples
 zz*.sh
