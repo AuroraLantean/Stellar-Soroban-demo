@@ -18,15 +18,22 @@ pub struct State {
 }
 const STATE: Symbol = symbol_short!("STATE");
 const MAX_COUNT: u32 = 5;
+
+#[contracttype]
+pub enum Registry {
+  User(Symbol),
+}
+//TODO: simpleAccount
 #[contract]
 pub struct Contract;
 
 #[contractimpl]
 impl Contract {
-  pub fn hello(env: Env, name: String) -> Vec<String> {
+  pub fn hello(env: Env, name: Symbol) {
     let time = env.ledger().timestamp();
-    log!(&env, "Name: {}. time: {}", name, time);
-    vec![&env, String::from_str(&env, "Hello"), name]
+    log!(&env, "time: {}", time);
+    //vec![&env, String::from_str(&env, "Hello"), nameString] // -> Vec<String>
+    log!(&env, "Hello {}", name);
   }
   pub fn increment(env: Env, incr: u32) -> Result<u32, Error> {
     let mut state = Self::get_state(env.clone());
@@ -36,6 +43,9 @@ impl Contract {
     if state.count <= MAX_COUNT {
       env.storage().instance().set(&STATE, &state);
       env.storage().instance().extend_ttl(50, 100);
+      env
+        .events()
+        .publish((STATE, symbol_short!("increment")), state.count);
       Ok(state.count)
     } else {
       Err(Error::LimitReached)

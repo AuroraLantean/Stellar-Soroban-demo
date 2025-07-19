@@ -1,7 +1,10 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{vec, Env, String};
+use soroban_sdk::{
+  testutils::{Events, Logs},
+  vec, Env, IntoVal, String,
+};
 extern crate std;
 use std::println as ll;
 
@@ -11,7 +14,11 @@ fn test_success1() {
   let contract_id = env.register(Contract, ());
   let client = ContractClient::new(&env, &contract_id);
 
-  let words = client.hello(&String::from_str(&env, "John Doe"));
+  client.hello(&symbol_short!("Dev"));
+  //let logs = env.logs().all();
+  //std::println!("logs: {}", logs.join("\n"));
+  //assert_eq!(logs, std::vec!["Hello Dev"]);
+  /*let words = client.hello(&String::from_str(&env, "John Doe"));
   assert_eq!(
     words,
     vec![
@@ -19,9 +26,20 @@ fn test_success1() {
       String::from_str(&env, "Hello"),
       String::from_str(&env, "John Doe"),
     ]
-  );
+  );*/
 
   assert_eq!(client.increment(&3), 3);
+  assert_eq!(
+    env.events().all(),
+    vec![
+      &env,
+      (
+        contract_id.clone(),
+        (symbol_short!("STATE"), symbol_short!("increment")).into_val(&env),
+        3u32.into_val(&env)
+      ),
+    ]
+  );
   assert_eq!(client.increment(&2), 5);
   let state = client.get_state();
   assert_eq!(state.count, 5);
@@ -33,7 +51,6 @@ fn test_success1() {
   assert_eq!(state.count, 99);
 
   //assert_eq!(client.increment(&1), Error::LimitReached);
-  //ll!("{}", env.logs().all().join("\n"));
 }
 
 #[test]
