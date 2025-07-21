@@ -1,7 +1,7 @@
 #![no_std]
 use soroban_sdk::{
   contract, contracterror, contractimpl, contracttype, log, panic_with_error, symbol_short, vec,
-  Env, String, Symbol, Vec,
+  Address, Env, String, Symbol, Vec,
 };
 
 #[contracterror]
@@ -9,6 +9,8 @@ use soroban_sdk::{
 #[repr(u32)]
 pub enum Error {
   LimitReached = 1,
+  UserExists = 2,
+  UserDoesNotExists = 3,
 }
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -21,7 +23,15 @@ const MAX_COUNT: u32 = 5;
 
 #[contracttype]
 pub enum Registry {
-  User(Symbol),
+  Users(Address),
+}
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct User {
+  pub addr: Address,
+  pub id: Symbol,
+  pub balance: u128,
+  pub updated_at: u64,
 }
 //TODO: simpleAccount
 #[contract]
@@ -29,6 +39,43 @@ pub struct Contract;
 
 #[contractimpl]
 impl Contract {
+  pub fn get_user(env: Env, addr: Address) -> User {
+    log!(&env, "get_user");
+    let registry = Registry::Users(addr.clone());
+    env.storage().instance().get(&registry).unwrap_or(User {
+      addr: addr,
+      id: symbol_short!("none"),
+      balance: 0,
+      updated_at: 0,
+    })
+  }
+  pub fn add_user(env: Env, addr: Address, id: Symbol) -> Result<u32, Error> {
+    let mut user = Self::get_user(env.clone(), addr.clone());
+    if user.updated_at != 0 {
+      return Err(Error::UserExists);
+    }
+    user.id = id;
+    user.updated_at = env.ledger().timestamp();
+    env
+      .storage()
+      .persistent()
+      .set(&Registry::Users(addr), &user);
+    Ok(0u32)
+  }
+  pub fn delete_user(env: Env, addr: Address, id: Symbol) -> Result<u32, Error> {
+    let mut user = Self::get_user(env.clone(), addr.clone());
+    if user.updated_at == 0 {
+      return Err(Error::UserDoesNotExists);
+    }
+    user.id = symbol_short!("none");
+    user.balance = 0;
+    user.updated_at = 0;
+    env
+      .storage()
+      .persistent()
+      .set(&Registry::Users(addr), &user);
+    Ok(0u32)
+  }
   pub fn hello(env: Env, name: Symbol) {
     let time = env.ledger().timestamp();
     log!(&env, "time: {}", time);

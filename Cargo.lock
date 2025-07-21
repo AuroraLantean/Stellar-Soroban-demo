@@ -428,6 +428,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dotenvy"
+version = "0.15.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
+
+[[package]]
 name = "downcast-rs"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -601,6 +607,8 @@ checksum = "5971ac85611da7067dbfcabef3c70ebb5606018acd9e2a3903a0da507521e0d5"
 name = "hello-world"
 version = "0.0.0"
 dependencies = [
+ "dotenvy",
+ "sep-41-token",
  "soroban-sdk",
 ]
 
@@ -1010,6 +1018,15 @@ name = "semver"
 version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56e6fa9c48d24d85fb3de5ad847117517440f6beceb7798af16b4a87d616b8d0"
+
+[[package]]
+name = "sep-41-token"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e60a68d00aaa835c22fb296d9addad26d08183e241f97f3ecb1284fec4a3b5c7"
+dependencies = [
+ "soroban-sdk",
+]
 
 [[package]]
 name = "serde"

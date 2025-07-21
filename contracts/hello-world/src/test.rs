@@ -1,10 +1,7 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{
-  testutils::{Events, Logs},
-  vec, Env, IntoVal, String,
-};
+use soroban_sdk::{testutils::Events, vec, Env, IntoVal, String}; //Logs
 extern crate std;
 use std::println as ll;
 
