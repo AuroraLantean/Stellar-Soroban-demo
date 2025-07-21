@@ -50,16 +50,16 @@ impl Contract {
     })
   }
   pub fn add_user(env: Env, addr: Address, id: Symbol) -> Result<u32, Error> {
+    log!(&env, "add_user");
     let mut user = Self::get_user(env.clone(), addr.clone());
     if user.updated_at != 0 {
       return Err(Error::UserExists);
     }
     user.id = id;
     user.updated_at = env.ledger().timestamp();
-    env
-      .storage()
-      .persistent()
-      .set(&Registry::Users(addr), &user);
+    //log!(&env, "user:{:?}", user);
+    //log!(&env, "timestamp:{:?}", env.ledger().timestamp());
+    env.storage().instance().set(&Registry::Users(addr), &user);
     Ok(0u32)
   }
   pub fn delete_user(env: Env, addr: Address, id: Symbol) -> Result<u32, Error> {
@@ -70,10 +70,7 @@ impl Contract {
     user.id = symbol_short!("none");
     user.balance = 0;
     user.updated_at = 0;
-    env
-      .storage()
-      .persistent()
-      .set(&Registry::Users(addr), &user);
+    env.storage().instance().set(&Registry::Users(addr), &user);
     Ok(0u32)
   }
   pub fn hello(env: Env, name: Symbol) {

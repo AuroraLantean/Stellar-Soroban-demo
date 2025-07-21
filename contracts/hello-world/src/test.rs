@@ -49,7 +49,25 @@ fn test_success1() {
 
   //assert_eq!(client.increment(&1), Error::LimitReached);
 }
+#[test]
+fn test_user() {
+  let env = Env::default();
+  let contract_id = env.register(Contract, ());
+  let client = ContractClient::new(&env, &contract_id);
 
+  let adam_addr = dotenvy::var("adam").expect("adam not found in .env");
+  let adam = Address::from_str(&env, adam_addr.as_str());
+
+  let adam_user = client.get_user(&adam);
+  ll!("adam_user: {:?}", adam_user);
+
+  let adam_id = symbol_short!("adam_id");
+  let out1 = client.add_user(&adam, &adam_id);
+  assert_eq!(out1, 0);
+  let adam_user2 = client.get_user(&adam);
+  ll!("adam_user2: {:?}", adam_user2);
+  assert_eq!(adam_user2.id, adam_id);
+}
 #[test]
 fn test_fail1() {
   let env = Env::default();
