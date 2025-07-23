@@ -59,7 +59,6 @@ fn test_user() {
   let client = ContractClient::new(&env, &contract_id);
 
   let addr1 = <soroban_sdk::Address as Address>::generate(&env);
-  let addr2 = <soroban_sdk::Address as Address>::generate(&env);
 
   let user_out = client.get_user(&addr1);
   ll!("user_out: {:?}", user_out);

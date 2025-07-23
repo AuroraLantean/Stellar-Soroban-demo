@@ -4,14 +4,8 @@ use soroban_sdk::{
   vec, Address, Env, String, Symbol, Vec,
 };
 
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum Error {
-  LimitReached = 1,
-  UserExists = 2,
-  UserDoesNotExists = 3,
-}
+use crate::err::Error;
+mod err;
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct State {
@@ -39,15 +33,65 @@ pub struct Contract;
 
 #[contractimpl]
 impl Contract {
-  pub fn deposit_token(env: Env, token: Address, sender: Address, amount: u128) {
+  pub fn approve_token(
+    env: Env,
+    token: Address,
+    sender: Address,
+    amount: u128,
+    expiration_ledger: u32,
+  ) {
+    log!(&env, "approve_token");
+    sender.require_auth();
+    let token = token::Client::new(&env, &token);
+    let ctrt_addr = env.current_contract_address();
+
+    let amount_i128 = amount.try_into().unwrap();
+    token.approve(&sender, &ctrt_addr, &amount_i128, &expiration_ledger);
+  }
+  pub fn deposit_token(
+    env: Env,
+    token: Address,
+    sender: Address,
+    amount: u128,
+  ) -> Result<u32, Error> {
     log!(&env, "deposit_token");
     sender.require_auth(); // Check if the caller  == sender argument
 
     let token = token::Client::new(&env, &token);
-    let contract_address = env.current_contract_address();
+    let ctrt_addr = env.current_contract_address();
 
     let amount_i128 = amount.try_into().unwrap();
-    token.transfer(&sender, &contract_address, &amount_i128);
+    let sender_balance = token.balance(&sender);
+    if sender_balance < amount_i128 {
+      return Err(Error::InsufficientBalance);
+    }
+    let allowance = token.allowance(&sender, &ctrt_addr);
+    if allowance < amount_i128 {
+      return Err(Error::InsufficientAllowance);
+    }
+
+    token.transfer_from(&ctrt_addr, &sender, &ctrt_addr, &amount_i128);
+    Ok(0u32)
+  }
+  pub fn withdraw_token(
+    env: Env,
+    token: Address,
+    sender: Address,
+    amount: u128,
+  ) -> Result<u32, Error> {
+    log!(&env, "withdraw_token");
+    sender.require_auth(); // Check if the caller  == sender argument
+
+    let token = token::Client::new(&env, &token);
+    let ctrt_addr = env.current_contract_address();
+
+    let amount_i128 = amount.try_into().unwrap();
+    let sender_balance = token.balance(&ctrt_addr);
+    if sender_balance < amount_i128 {
+      return Err(Error::InsufficientBalance);
+    }
+    token.transfer(&ctrt_addr, &sender, &amount_i128);
+    Ok(0u32)
   }
 
   pub fn get_user(env: Env, addr: Address) -> User {
