@@ -1,7 +1,10 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::Events, vec, Env, IntoVal, String}; //Logs
+use soroban_sdk::{
+  testutils::{Address, Events},
+  vec, Env, IntoVal, String,
+}; //Logs
 extern crate std;
 use std::println as ll;
 
@@ -55,16 +58,16 @@ fn test_user() {
   let contract_id = env.register(Contract, ());
   let client = ContractClient::new(&env, &contract_id);
 
-  let adam_addr = dotenvy::var("adam").expect("adam not found in .env");
-  let adam = Address::from_str(&env, adam_addr.as_str());
+  let addr1 = <soroban_sdk::Address as Address>::generate(&env);
+  let addr2 = <soroban_sdk::Address as Address>::generate(&env);
 
-  let adam_user = client.get_user(&adam);
-  ll!("adam_user: {:?}", adam_user);
+  let user_out = client.get_user(&addr1);
+  ll!("user_out: {:?}", user_out);
 
   let adam_id = symbol_short!("adam_id");
-  let out1 = client.add_user(&adam, &adam_id);
+  let out1 = client.add_user(&addr1, &adam_id);
   assert_eq!(out1, 0);
-  let adam_user2 = client.get_user(&adam);
+  let adam_user2 = client.get_user(&addr1);
   ll!("adam_user2: {:?}", adam_user2);
   assert_eq!(adam_user2.id, adam_id);
 }

@@ -1,7 +1,7 @@
 #![no_std]
 use soroban_sdk::{
-  contract, contracterror, contractimpl, contracttype, log, panic_with_error, symbol_short, vec,
-  Address, Env, String, Symbol, Vec,
+  contract, contracterror, contractimpl, contracttype, log, panic_with_error, symbol_short, token,
+  vec, Address, Env, String, Symbol, Vec,
 };
 
 #[contracterror]
@@ -39,6 +39,17 @@ pub struct Contract;
 
 #[contractimpl]
 impl Contract {
+  pub fn deposit_token(env: Env, token: Address, sender: Address, amount: u128) {
+    log!(&env, "deposit_token");
+    sender.require_auth(); // Check if the caller  == sender argument
+
+    let token = token::Client::new(&env, &token);
+    let contract_address = env.current_contract_address();
+
+    let amount_i128 = amount.try_into().unwrap();
+    token.transfer(&sender, &contract_address, &amount_i128);
+  }
+
   pub fn get_user(env: Env, addr: Address) -> User {
     log!(&env, "get_user");
     let registry = Registry::Users(addr.clone());
