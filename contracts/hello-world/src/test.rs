@@ -46,6 +46,8 @@ fn test_token() {
   let user_id = symbol_short!("user1");
   let out1 = client.add_user(&user1, &user_id);
   assert_eq!(out1, 0);
+  let user1u = client.get_user(&user1);
+  assert_eq!(user1u.id, user_id);
 
   client.approve_token(&token.address, &user1, &700, &100);
   client.deposit_token(&token.address, &user1, &700);
@@ -59,6 +61,12 @@ fn test_token() {
   let user1u = client.get_user(&user1);
   ll!("user1u: {:?}", user1u);
   assert_eq!(user1u.balance, 200);
+
+  client.withdraw_token(&token.address, &user1, &200);
+  client.delete_user(&user1);
+  let user1u = client.get_user(&user1);
+  ll!("user1u: {:?}", user1u);
+  assert_eq!(user1u.updated_at, 0);
 }
 #[test]
 fn test_get_state() {
@@ -89,23 +97,7 @@ fn test_get_state() {
 
   //assert_eq!(client.increment(&1), Error::LimitReached);
 }
-#[test]
-fn test_user() {
-  let env = Env::default();
-  let (_, client) = new_hello(&env);
 
-  let addr1 = Address::generate(&env);
-
-  let user_out = client.get_user(&addr1);
-  ll!("user_out: {:?}", user_out);
-
-  let adam_id = symbol_short!("adam_id");
-  let out1 = client.add_user(&addr1, &adam_id);
-  assert_eq!(out1, 0);
-  let adam_user2 = client.get_user(&addr1);
-  ll!("adam_user2: {:?}", adam_user2);
-  assert_eq!(adam_user2.id, adam_id);
-}
 #[test]
 fn test_fail1() {
   let env = Env::default();

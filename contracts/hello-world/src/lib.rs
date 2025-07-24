@@ -154,16 +154,12 @@ impl Hello {
     env.storage().instance().set(&Registry::Users(addr), &user);
     Ok(0u32)
   }
-  pub fn delete_user(env: Env, addr: Address, _id: Symbol) -> Result<u32, Error> {
-    let mut user = Self::get_user(env.clone(), addr.clone())?;
-    if user.updated_at == 0 {
-      return Err(Error::UserDoesNotExist);
+  pub fn delete_user(env: Env, addr: Address) -> Result<u32, Error> {
+    let user = Self::get_user(env.clone(), addr.clone())?;
+    if user.balance > 0 {
+      return Err(Error::BalanceExists);
     }
-    user.id = symbol_short!("none");
-    user.balance = 0;
-    user.updated_at = 0;
     env.storage().instance().remove(&user);
-    //env.storage().instance().set(&Registry::Users(addr), &user);
     Ok(0u32)
   }
 

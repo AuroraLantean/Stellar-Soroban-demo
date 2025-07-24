@@ -8,4 +8,5 @@ pub enum Error {
   UserDoesNotExist = 3,
   InsufficientBalance = 4,
   InsufficientAllowance = 5,
+  BalanceExists = 6,
 }
