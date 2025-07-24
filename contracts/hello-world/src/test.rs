@@ -1,16 +1,13 @@
 #![cfg(test)]
 
 use super::*;
-//use crate::token::TokenClient;
 use token::Client as TokenClient;
 use token::StellarAssetClient as TokenAdminClient;
 //soroban-token-sdk
 //use sep_41_token::Token;
-//use soroban_sdk::token::TokenClient;
-//use crate::{contract::Token, TokenClient};
 use soroban_sdk::{
-  testutils::{self, Address as TestAddr, AuthorizedFunction, AuthorizedInvocation, Events},
-  vec, Address, Env, FromVal, IntoVal, String,
+  testutils::{Address as TestAddr, Events},
+  vec, Address, Env, IntoVal,
 }; //Logs
 extern crate std;
 use std::println as ll;
@@ -45,25 +42,28 @@ fn test_token() {
   assert_eq!(token.balance(&user1), 1000);
   assert_eq!(token.balance(&user2), 2000);
   assert_eq!(token.balance(&contract_id), 0);
+
+  let user_id = symbol_short!("user1");
+  let out1 = client.add_user(&user1, &user_id);
+  assert_eq!(out1, 0);
+
+  client.approve_token(&token.address, &user1, &700, &100);
+  client.deposit_token(&token.address, &user1, &700);
+  assert_eq!(token.balance(&user1), 300);
+  assert_eq!(token.balance(&contract_id), 700);
+
+  client.withdraw_token(&token.address, &user1, &500);
+  assert_eq!(token.balance(&user1), 800);
+  assert_eq!(token.balance(&contract_id), 200);
+
+  let user1u = client.get_user(&user1);
+  ll!("user1u: {:?}", user1u);
+  assert_eq!(user1u.balance, 200);
 }
 #[test]
-fn test_success1() {
+fn test_get_state() {
   let env = Env::default();
   let (contract_id, client) = new_hello(&env);
-
-  client.hello(&symbol_short!("Dev"));
-  //let logs = env.logs().all();
-  //std::println!("logs: {}", logs.join("\n"));
-  //assert_eq!(logs, std::vec!["Hello Dev"]);
-  /*let words = client.hello(&String::from_str(&env, "John Doe"));
-  assert_eq!(
-    words,
-    vec![
-      &env,
-      String::from_str(&env, "Hello"),
-      String::from_str(&env, "John Doe"),
-    ]
-  );*/
 
   assert_eq!(client.increment(&3), 3);
   assert_eq!(
@@ -113,7 +113,7 @@ fn test_fail1() {
   ll!("test_fail1");
   //log!(&env, "state.count: {:?}", "John");
   assert_eq!(client.increment(&5), 5);
-  assert_eq!(client.try_increment(&1), Err(Ok(Error::LimitReached)));
+  assert_eq!(client.try_increment(&1), Err(Ok(Error::MaxCountReached)));
   ll!("{:?}", env.logs());
   //ll!("{}", env.logs().all().join("\n"));
 }

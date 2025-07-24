@@ -1,7 +1,7 @@
 #![no_std]
 use soroban_sdk::{
-  contract, contractimpl, contracttype, log, panic_with_error, symbol_short, token, vec, Address,
-  Env, String, Symbol, Vec,
+  contract, contractimpl, contracttype, log, panic_with_error, symbol_short, token, Address, Env,
+  Symbol,
 };
 
 use crate::err::Error;
@@ -69,6 +69,17 @@ impl Hello {
     if allowance < amount_i128 {
       return Err(Error::InsufficientAllowance);
     }
+    log!(&env, "about to get_user");
+    let mut user = Self::get_user(env.clone(), sender.clone())?;
+
+    user.balance += amount;
+    user.updated_at = env.ledger().timestamp();
+    //log!(&env, "user:{:?}", user);
+    env
+      .storage()
+      .instance()
+      .set(&Registry::Users(sender.clone()), &user);
+    env.storage().instance().extend_ttl(50, 100);
 
     token.transfer_from(&ctrt_addr, &sender, &ctrt_addr, &amount_i128);
     Ok(0u32)
@@ -90,6 +101,17 @@ impl Hello {
     if sender_balance < amount_i128 {
       return Err(Error::InsufficientBalance);
     }
+    log!(&env, "about to get_user");
+    let mut user = Self::get_user(env.clone(), sender.clone())?;
+
+    user.balance -= amount;
+    user.updated_at = env.ledger().timestamp();
+    //log!(&env, "user:{:?}", user);
+    env
+      .storage()
+      .instance()
+      .set(&Registry::Users(sender.clone()), &user);
+
     token.transfer(&ctrt_addr, &sender, &amount_i128);
     Ok(0u32)
   }
@@ -106,46 +128,45 @@ impl Hello {
     Ok((balance, allowance))
   }
 
-  pub fn get_user(env: Env, addr: Address) -> User {
+  pub fn get_user(env: Env, addr: Address) -> Result<User, Error> {
     log!(&env, "get_user");
     let registry = Registry::Users(addr.clone());
-    env.storage().instance().get(&registry).unwrap_or(User {
-      addr: addr,
-      id: symbol_short!("none"),
-      balance: 0,
-      updated_at: 0,
-    })
+    env
+      .storage()
+      .instance()
+      .get(&registry)
+      .unwrap_or(Err(Error::UserDoesNotExist))
   }
   pub fn add_user(env: Env, addr: Address, id: Symbol) -> Result<u32, Error> {
     log!(&env, "add_user");
-    let mut user = Self::get_user(env.clone(), addr.clone());
-    if user.updated_at != 0 {
+    let registry = Registry::Users(addr.clone());
+    let user_opt: Option<User> = env.storage().instance().get(&registry);
+    if user_opt.is_some() {
       return Err(Error::UserExists);
     }
-    user.id = id;
-    user.updated_at = env.ledger().timestamp();
+    let user = User {
+      addr: addr.clone(),
+      id: id,
+      balance: 0,
+      updated_at: env.ledger().timestamp(),
+    };
     //log!(&env, "user:{:?}", user);
-    //log!(&env, "timestamp:{:?}", env.ledger().timestamp());
     env.storage().instance().set(&Registry::Users(addr), &user);
     Ok(0u32)
   }
-  pub fn delete_user(env: Env, addr: Address, id: Symbol) -> Result<u32, Error> {
-    let mut user = Self::get_user(env.clone(), addr.clone());
+  pub fn delete_user(env: Env, addr: Address, _id: Symbol) -> Result<u32, Error> {
+    let mut user = Self::get_user(env.clone(), addr.clone())?;
     if user.updated_at == 0 {
-      return Err(Error::UserDoesNotExists);
+      return Err(Error::UserDoesNotExist);
     }
     user.id = symbol_short!("none");
     user.balance = 0;
     user.updated_at = 0;
-    env.storage().instance().set(&Registry::Users(addr), &user);
+    env.storage().instance().remove(&user);
+    //env.storage().instance().set(&Registry::Users(addr), &user);
     Ok(0u32)
   }
-  pub fn hello(env: Env, name: Symbol) {
-    let time = env.ledger().timestamp();
-    log!(&env, "time: {}", time);
-    //vec![&env, String::from_str(&env, "Hello"), nameString] // -> Vec<String>
-    log!(&env, "Hello {}", name);
-  }
+
   pub fn increment(env: Env, incr: u32) -> Result<u32, Error> {
     let mut state = Self::get_state(env.clone());
     log!(&env, "increment: {}", state);
@@ -159,7 +180,7 @@ impl Hello {
         .publish((STATE, symbol_short!("increment")), state.count);
       Ok(state.count)
     } else {
-      Err(Error::LimitReached)
+      Err(Error::MaxCountReached)
     }
   }
   pub fn debugging(env: Env, value: u32) -> u32 {
@@ -167,7 +188,7 @@ impl Hello {
       0 => 0,
       _ => {
         log!(&env, "fail");
-        panic_with_error!(&env, Error::LimitReached);
+        panic_with_error!(&env, Error::MaxCountReached);
       }
     }
   }
@@ -182,6 +203,10 @@ impl Hello {
     Ok(state.count)
   }
   pub fn get_state(env: Env) -> State {
+    let time = env.ledger().timestamp();
+    log!(&env, "time: {}", time);
+    //vec![&env, String::from_str(&env, "Hello"), nameString] // -> Vec<String>
+
     env.storage().instance().get(&STATE).unwrap_or(State {
       count: 0,
       last_incr: 0,
