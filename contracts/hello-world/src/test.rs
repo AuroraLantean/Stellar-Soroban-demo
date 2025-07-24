@@ -1,18 +1,55 @@
 #![cfg(test)]
 
 use super::*;
+//use crate::token::TokenClient;
+use token::Client as TokenClient;
+use token::StellarAssetClient as TokenAdminClient;
+//soroban-token-sdk
+//use sep_41_token::Token;
+//use soroban_sdk::token::TokenClient;
+//use crate::{contract::Token, TokenClient};
 use soroban_sdk::{
-  testutils::{Address, Events},
-  vec, Env, IntoVal, String,
+  testutils::{self, Address as TestAddr, AuthorizedFunction, AuthorizedInvocation, Events},
+  vec, Address, Env, FromVal, IntoVal, String,
 }; //Logs
 extern crate std;
 use std::println as ll;
 
+fn new_token_ctrt<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, TokenAdminClient<'a>) {
+  let sac = e.register_stellar_asset_contract_v2(admin.clone());
+  (
+    token::Client::new(e, &sac.address()),
+    token::StellarAssetClient::new(e, &sac.address()),
+  )
+}
+fn new_hello(e: &Env) -> (Address, HelloClient) {
+  let contract_id = e.register(Hello, ());
+  let client = HelloClient::new(e, &contract_id);
+  (contract_id, client)
+}
+
+#[test]
+fn test_token() {
+  let env = Env::default();
+  env.mock_all_auths();
+
+  let admin = Address::generate(&env);
+  let user1 = Address::generate(&env);
+  let user2 = Address::generate(&env);
+  let (token, asset) = new_token_ctrt(&env, &admin);
+  let (contract_id, client) = new_hello(&env);
+
+  asset.mint(&user1, &1000);
+  asset.mint(&user2, &2000);
+
+  assert_eq!(token.balance(&user1), 1000);
+  assert_eq!(token.balance(&user2), 2000);
+  assert_eq!(token.balance(&contract_id), 0);
+}
 #[test]
 fn test_success1() {
   let env = Env::default();
-  let contract_id = env.register(Contract, ());
-  let client = ContractClient::new(&env, &contract_id);
+  let (contract_id, client) = new_hello(&env);
 
   client.hello(&symbol_short!("Dev"));
   //let logs = env.logs().all();
@@ -55,10 +92,9 @@ fn test_success1() {
 #[test]
 fn test_user() {
   let env = Env::default();
-  let contract_id = env.register(Contract, ());
-  let client = ContractClient::new(&env, &contract_id);
+  let (_, client) = new_hello(&env);
 
-  let addr1 = <soroban_sdk::Address as Address>::generate(&env);
+  let addr1 = Address::generate(&env);
 
   let user_out = client.get_user(&addr1);
   ll!("user_out: {:?}", user_out);
@@ -73,8 +109,7 @@ fn test_user() {
 #[test]
 fn test_fail1() {
   let env = Env::default();
-  let contract_id = env.register(Contract, ());
-  let client = ContractClient::new(&env, &contract_id);
+  let (_, client) = new_hello(&env);
   ll!("test_fail1");
   //log!(&env, "state.count: {:?}", "John");
   assert_eq!(client.increment(&5), 5);
@@ -86,8 +121,7 @@ fn test_fail1() {
 #[should_panic(expected = "HostError: Error(Contract, #1)")]
 fn test_fail2() {
   let env = Env::default();
-  let contract_id = env.register(Contract, ());
-  let client = ContractClient::new(&env, &contract_id);
+  let (_, client) = new_hello(&env);
 
   assert_eq!(client.increment(&5), 5);
   let state = client.get_state();
@@ -98,7 +132,6 @@ fn test_fail2() {
 #[should_panic(expected = "HostError: Error(Contract, #1)")]
 fn test_debugging() {
   let env = Env::default();
-  let contract_id = env.register(Contract, ());
-  let client = ContractClient::new(&env, &contract_id);
+  let (_, client) = new_hello(&env);
   client.debugging(&1);
 }

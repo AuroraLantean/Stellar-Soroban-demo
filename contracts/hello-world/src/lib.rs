@@ -1,7 +1,7 @@
 #![no_std]
 use soroban_sdk::{
-  contract, contracterror, contractimpl, contracttype, log, panic_with_error, symbol_short, token,
-  vec, Address, Env, String, Symbol, Vec,
+  contract, contractimpl, contracttype, log, panic_with_error, symbol_short, token, vec, Address,
+  Env, String, Symbol, Vec,
 };
 
 use crate::err::Error;
@@ -29,10 +29,10 @@ pub struct User {
 }
 //TODO: simpleAccount
 #[contract]
-pub struct Contract;
+pub struct Hello;
 
 #[contractimpl]
-impl Contract {
+impl Hello {
   pub fn approve_token(
     env: Env,
     token: Address,
@@ -92,6 +92,18 @@ impl Contract {
     }
     token.transfer(&ctrt_addr, &sender, &amount_i128);
     Ok(0u32)
+  }
+  pub fn balance_allowance(
+    env: Env,
+    token: Address,
+    target: Address,
+  ) -> Result<(i128, i128), Error> {
+    log!(&env, "balance_allowance");
+    let token = token::Client::new(&env, &token);
+    let ctrt_addr = env.current_contract_address();
+    let balance = token.balance(&target);
+    let allowance = token.allowance(&target, &ctrt_addr);
+    Ok((balance, allowance))
   }
 
   pub fn get_user(env: Env, addr: Address) -> User {
