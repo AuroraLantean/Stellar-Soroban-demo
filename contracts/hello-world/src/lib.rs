@@ -1,32 +1,15 @@
 #![no_std]
+use sep_41_token::TokenClient;
 use soroban_sdk::{
-  contract, contractimpl, contracttype, log, panic_with_error, symbol_short, token, Address, Env,
-  Symbol,
+  contract, contractimpl, log, panic_with_error, symbol_short, token, Address, Env, Symbol,
 };
 
-use crate::err::Error;
-mod err;
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct State {
-  pub count: u32,
-  pub last_incr: u32,
-}
+use crate::types::{Error, Registry, State, User};
+mod types;
+
 const STATE: Symbol = symbol_short!("STATE");
 const MAX_COUNT: u32 = 5;
 
-#[contracttype]
-pub enum Registry {
-  Users(Address),
-}
-#[contracttype]
-#[derive(Clone, Debug)]
-pub struct User {
-  pub addr: Address,
-  pub id: Symbol,
-  pub balance: u128,
-  pub updated_at: u64,
-}
 //TODO: simpleAccount
 #[contract]
 pub struct Hello;
