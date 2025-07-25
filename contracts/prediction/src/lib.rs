@@ -114,7 +114,7 @@ impl Prediction {
     token.transfer(&ctrt_addr, &sender, &amount_i128);
     Ok(0u32)
   }
-  pub fn admin_func(env: Env, admin: Address) {
+  pub fn admin_func(_env: Env, admin: Address) {
     admin.require_auth();
     //TODO
   }
