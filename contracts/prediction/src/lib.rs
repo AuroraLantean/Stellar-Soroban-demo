@@ -1,6 +1,8 @@
 #![no_std]
 use sep_41_token::TokenClient;
-use soroban_sdk::{contract, contractimpl, log, symbol_short, token, Address, Env, Symbol};
+use soroban_sdk::{
+  contract, contractimpl, log, symbol_short, token, vec, Address, Env, String, Symbol,
+};
 
 use crate::types::{Error, Registry, State, User, MAX_COUNT, STATE};
 mod types;
@@ -11,6 +13,21 @@ pub struct Prediction;
 
 #[contractimpl]
 impl Prediction {
+  pub fn __constructor(env: Env, admin: Address, token: Address, market_name: String) {
+    log!(&env, "__constructor");
+    //signers: Vec<BytesN<32>>
+    //check_string_not_empty(&env, &market_name);
+    let state = State {
+      count: 0,
+      last_incr: 0,
+      admin,
+      token,
+      market_name,
+      bet_values: vec![&env, 0, 0, 0, 0],
+      bet_numbers: vec![&env, 0, 0, 0, 0],
+    };
+    env.storage().persistent().set(&STATE, &state);
+  }
   pub fn approve_token(
     env: Env,
     token: Address,
@@ -97,6 +114,10 @@ impl Prediction {
     token.transfer(&ctrt_addr, &sender, &amount_i128);
     Ok(0u32)
   }
+  pub fn admin_func(env: Env, admin: Address) {
+    admin.require_auth();
+    //TODO
+  }
   pub fn balance_allowance(
     env: Env,
     token: Address,
@@ -146,7 +167,7 @@ impl Prediction {
   }
 
   pub fn increment(env: Env, incr: u32) -> Result<u32, Error> {
-    let mut state = Self::get_state(env.clone());
+    let mut state = Self::get_state(env.clone())?;
     log!(&env, "increment: {}", state);
     state.count += incr;
     state.last_incr = incr;
@@ -168,7 +189,7 @@ impl Prediction {
   }
 
   pub fn reset_count(env: Env, value: u32) -> Result<u32, Error> {
-    let mut state = Self::get_state(env.clone());
+    let mut state = Self::get_state(env.clone())?;
     log!(&env, "reset_count: {}", state);
 
     state.count = value;
@@ -180,15 +201,15 @@ impl Prediction {
       .extend_ttl(&STATE, 50, env.storage().max_ttl());
     Ok(state.count)
   }
-  pub fn get_state(env: Env) -> State {
+  pub fn get_state(env: Env) -> Result<State, Error> {
     let time = env.ledger().timestamp();
     log!(&env, "time: {}", time);
     //vec![&env, String::from_str(&env, "Hello"), nameString] // -> Vec<String>
-
-    env.storage().persistent().get(&STATE).unwrap_or(State {
-      count: 0,
-      last_incr: 0,
-    }) // If no value set, assume 0.
+    let state_opt = env.storage().persistent().get(&STATE);
+    if state_opt.is_none() {
+      return Err(Error::StateNotInitialized);
+    }
+    state_opt.unwrap()
   }
 }
 

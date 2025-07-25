@@ -19,8 +19,13 @@ fn new_token_ctrt<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, TokenAdminC
     token::StellarAssetClient::new(e, &sac.address()),
   )
 }
-fn new_ctrt(e: &Env) -> (Address, PredictionClient) {
-  let contract_id = e.register(Prediction, ());
+fn new_ctrt(
+  e: &Env,
+  admin: Address,
+  token: Address,
+  market_name: String,
+) -> (Address, PredictionClient) {
+  let contract_id = e.register(Prediction, (admin, token, market_name));
   let client = PredictionClient::new(e, &contract_id);
   (contract_id, client)
 }
@@ -34,7 +39,9 @@ fn test_token() {
   let user1 = Address::generate(&env);
   let user2 = Address::generate(&env);
   let (token, asset) = new_token_ctrt(&env, &admin);
-  let (contract_id, client) = new_ctrt(&env);
+  let token_addr = token.address.clone();
+  let market_name = String::from_str(&env, "prediction");
+  let (contract_id, client) = new_ctrt(&env, admin, token_addr.clone(), market_name);
 
   asset.mint(&user1, &1000);
   asset.mint(&user2, &2000);
@@ -49,12 +56,12 @@ fn test_token() {
   let user1u = client.get_user(&user1);
   assert_eq!(user1u.id, user_id);
 
-  client.approve_token(&token.address, &user1, &700, &100);
-  client.deposit_token(&token.address, &user1, &700);
+  client.approve_token(&token_addr, &user1, &700, &100);
+  client.deposit_token(&token_addr, &user1, &700);
   assert_eq!(token.balance(&user1), 300);
   assert_eq!(token.balance(&contract_id), 700);
 
-  client.withdraw_token(&token.address, &user1, &500);
+  client.withdraw_token(&token_addr, &user1, &500);
   assert_eq!(token.balance(&user1), 800);
   assert_eq!(token.balance(&contract_id), 200);
 
@@ -62,16 +69,25 @@ fn test_token() {
   ll!("user1u: {:?}", user1u);
   assert_eq!(user1u.balance, 200);
 
-  client.withdraw_token(&token.address, &user1, &200);
+  client.withdraw_token(&token_addr, &user1, &200);
   client.delete_user(&user1);
   let user1u = client.get_user(&user1);
   ll!("user1u: {:?}", user1u);
   assert_eq!(user1u.updated_at, 0);
 }
 #[test]
-fn test_get_state() {
+fn test_state() {
   let env = Env::default();
-  let (contract_id, client) = new_ctrt(&env);
+  let admin = Address::generate(&env);
+  let (token, _asset) = new_token_ctrt(&env, &admin);
+  let token_addr = token.address.clone();
+  let market_name = String::from_str(&env, "prediction");
+
+  let (contract_id, client) = new_ctrt(&env, admin, token_addr, market_name);
+
+  let state = client.get_state();
+  ll!("state: {:?}", state);
+  assert_eq!(state.count, 0);
 
   assert_eq!(client.increment(&3), 3);
   assert_eq!(
@@ -101,7 +117,12 @@ fn test_get_state() {
 #[test]
 fn testf_max_count() {
   let env = Env::default();
-  let (_, client) = new_ctrt(&env);
+  let admin = Address::generate(&env);
+  let (token, _asset) = new_token_ctrt(&env, &admin);
+  let token_addr = token.address.clone();
+  let market_name = String::from_str(&env, "prediction");
+
+  let (_, client) = new_ctrt(&env, admin, token_addr, market_name);
   ll!("test_fail1");
   //log!(&env, "state.count: {:?}", "John");
   assert_eq!(client.increment(&5), 5);
@@ -113,7 +134,11 @@ fn testf_max_count() {
 #[should_panic(expected = "HostError: Error(Contract, #1)")]
 fn testf_max_count2() {
   let env = Env::default();
-  let (_, client) = new_ctrt(&env);
+  let admin = Address::generate(&env);
+  let (token, _asset) = new_token_ctrt(&env, &admin);
+  let token_addr = token.address.clone();
+  let market_name = String::from_str(&env, "prediction");
+  let (_, client) = new_ctrt(&env, admin, token_addr, market_name);
 
   assert_eq!(client.increment(&5), 5);
   let state = client.get_state();

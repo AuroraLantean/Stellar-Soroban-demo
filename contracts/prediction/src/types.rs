@@ -1,4 +1,4 @@
-use soroban_sdk::{contracterror, contracttype, symbol_short, Address, Symbol};
+use soroban_sdk::{contracterror, contracttype, symbol_short, Address, String, Symbol, Vec};
 
 //----------== Error
 #[contracterror]
@@ -11,6 +11,7 @@ pub enum Error {
   InsufficientBalance = 4,
   InsufficientAllowance = 5,
   BalanceExists = 6,
+  StateNotInitialized = 7,
 }
 //----------== Config
 pub const MAX_COUNT: u32 = 5;
@@ -21,12 +22,19 @@ pub const STATE: Symbol = symbol_short!("STATE");
 pub struct State {
   pub count: u32,
   pub last_incr: u32,
+  pub admin: Address,
+  pub token: Address,
+  pub market_name: String,
+  pub bet_values: Vec<u128>,
+  pub bet_numbers: Vec<u128>,
 }
 
 #[contracttype]
 pub enum Registry {
   Users(Address),
+  Owner,
 }
+//if env.storage().instance().has(&DataKey::Owner) {  panic!("owner is already set"); }
 #[contracttype]
 #[derive(Clone, Debug)]
 pub struct User {
@@ -47,7 +55,7 @@ pub enum Outcome {
 #[derive(Clone, Debug)]
 pub struct Bets {
   pub bettor: Address,
-  pub amount: i128,
+  pub amount: u128,
   pub bet_on_true: bool,
   pub claimed: bool,
 }
