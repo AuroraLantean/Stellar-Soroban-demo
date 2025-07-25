@@ -1,4 +1,4 @@
-use soroban_sdk::{contracterror, contracttype, Address, Symbol};
+use soroban_sdk::{contracterror, contracttype, symbol_short, Address, Symbol};
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
@@ -11,6 +11,7 @@ pub enum Error {
   BalanceExists = 6,
 }
 //----------== Bank
+pub const STATE: Symbol = symbol_short!("STATE");
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct State {

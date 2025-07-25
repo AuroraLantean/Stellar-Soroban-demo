@@ -4,10 +4,9 @@ use soroban_sdk::{
   contract, contractimpl, log, panic_with_error, symbol_short, token, Address, Env, Symbol,
 };
 
-use crate::types::{Error, Registry, State, User};
+use crate::types::{Error, Registry, State, User, STATE};
 mod types;
 
-const STATE: Symbol = symbol_short!("STATE");
 const MAX_COUNT: u32 = 5;
 
 //TODO: simpleAccount
@@ -58,11 +57,12 @@ impl Hello {
     user.balance += amount;
     user.updated_at = env.ledger().timestamp();
     //log!(&env, "user:{:?}", user);
+    let key = Registry::Users(sender.clone());
+    env.storage().persistent().set(&key, &user);
     env
       .storage()
-      .instance()
-      .set(&Registry::Users(sender.clone()), &user);
-    env.storage().instance().extend_ttl(50, 100);
+      .persistent()
+      .extend_ttl(&key, 50, env.storage().max_ttl());
 
     token.transfer_from(&ctrt_addr, &sender, &ctrt_addr, &amount_i128);
     Ok(0u32)
@@ -90,10 +90,13 @@ impl Hello {
     user.balance -= amount;
     user.updated_at = env.ledger().timestamp();
     //log!(&env, "user:{:?}", user);
+    let key = Registry::Users(sender.clone());
+    env.storage().persistent().set(&key, &user);
+
     env
       .storage()
-      .instance()
-      .set(&Registry::Users(sender.clone()), &user);
+      .persistent()
+      .extend_ttl(&key, 50, env.storage().max_ttl());
 
     token.transfer(&ctrt_addr, &sender, &amount_i128);
     Ok(0u32)
@@ -113,17 +116,17 @@ impl Hello {
 
   pub fn get_user(env: Env, addr: Address) -> Result<User, Error> {
     log!(&env, "get_user");
-    let registry = Registry::Users(addr.clone());
+    let key = Registry::Users(addr.clone());
     env
       .storage()
-      .instance()
-      .get(&registry)
+      .persistent()
+      .get(&key)
       .unwrap_or(Err(Error::UserDoesNotExist))
   }
   pub fn add_user(env: Env, addr: Address, id: Symbol) -> Result<u32, Error> {
     log!(&env, "add_user");
-    let registry = Registry::Users(addr.clone());
-    let user_opt: Option<User> = env.storage().instance().get(&registry);
+    let key = Registry::Users(addr.clone());
+    let user_opt: Option<User> = env.storage().persistent().get(&key);
     if user_opt.is_some() {
       return Err(Error::UserExists);
     }
@@ -134,7 +137,7 @@ impl Hello {
       updated_at: env.ledger().timestamp(),
     };
     //log!(&env, "user:{:?}", user);
-    env.storage().instance().set(&Registry::Users(addr), &user);
+    env.storage().persistent().set(&key, &user);
     Ok(0u32)
   }
   pub fn delete_user(env: Env, addr: Address) -> Result<u32, Error> {
@@ -142,7 +145,7 @@ impl Hello {
     if user.balance > 0 {
       return Err(Error::BalanceExists);
     }
-    env.storage().instance().remove(&user);
+    env.storage().persistent().remove(&user);
     Ok(0u32)
   }
 
@@ -152,8 +155,11 @@ impl Hello {
     state.count += incr;
     state.last_incr = incr;
     if state.count <= MAX_COUNT {
-      env.storage().instance().set(&STATE, &state);
-      env.storage().instance().extend_ttl(50, 100);
+      env.storage().persistent().set(&STATE, &state);
+      env
+        .storage()
+        .persistent()
+        .extend_ttl(&STATE, 50, env.storage().max_ttl());
       env
         .events()
         .publish((STATE, symbol_short!("increment")), state.count);
@@ -177,8 +183,11 @@ impl Hello {
 
     state.count = value;
     state.last_incr = value;
-    env.storage().instance().set(&STATE, &state);
-    env.storage().instance().extend_ttl(50, 100);
+    env.storage().persistent().set(&STATE, &state);
+    env
+      .storage()
+      .persistent()
+      .extend_ttl(&STATE, 50, env.storage().max_ttl());
     Ok(state.count)
   }
   pub fn get_state(env: Env) -> State {
@@ -186,7 +195,7 @@ impl Hello {
     log!(&env, "time: {}", time);
     //vec![&env, String::from_str(&env, "Hello"), nameString] // -> Vec<String>
 
-    env.storage().instance().get(&STATE).unwrap_or(State {
+    env.storage().persistent().get(&STATE).unwrap_or(State {
       count: 0,
       last_incr: 0,
     }) // If no value set, assume 0.
