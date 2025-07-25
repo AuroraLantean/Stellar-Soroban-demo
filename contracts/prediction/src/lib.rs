@@ -4,7 +4,7 @@ use soroban_sdk::{
   contract, contractimpl, log, symbol_short, token, vec, Address, Env, String, Symbol,
 };
 
-use crate::types::{Error, Registry, State, User, MAX_COUNT, STATE};
+use crate::types::{Error, Registry, State, Status, User, MAX_COUNT, STATE};
 mod types;
 
 //TODO: simpleAccount
@@ -23,26 +23,13 @@ impl Prediction {
       admin,
       token,
       market_name,
+      status: Status::Initial,
       bet_values: vec![&env, 0, 0, 0, 0],
       bet_numbers: vec![&env, 0, 0, 0, 0],
     };
     env.storage().persistent().set(&STATE, &state);
   }
-  pub fn approve_token(
-    env: Env,
-    token: Address,
-    sender: Address,
-    amount: u128,
-    expiration_ledger: u32,
-  ) {
-    log!(&env, "approve_token");
-    sender.require_auth();
-    let token = token::Client::new(&env, &token);
-    let ctrt_addr = env.current_contract_address();
 
-    let amount_i128 = amount.try_into().unwrap();
-    token.approve(&sender, &ctrt_addr, &amount_i128, &expiration_ledger);
-  }
   pub fn deposit_token(
     env: Env,
     token: Address,

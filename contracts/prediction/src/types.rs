@@ -1,3 +1,5 @@
+use core::ops::Add;
+
 use soroban_sdk::{contracterror, contracttype, symbol_short, Address, String, Symbol, Vec};
 
 //----------== Error
@@ -25,6 +27,7 @@ pub struct State {
   pub admin: Address,
   pub token: Address,
   pub market_name: String,
+  pub status: Status,
   pub bet_values: Vec<u128>,
   pub bet_numbers: Vec<u128>,
 }
@@ -32,7 +35,7 @@ pub struct State {
 #[contracttype]
 pub enum Registry {
   Users(Address),
-  Owner,
+  Bets(Address, Address),
 }
 //if env.storage().instance().has(&DataKey::Owner) {  panic!("owner is already set"); }
 #[contracttype]
@@ -46,10 +49,12 @@ pub struct User {
 //----------== Prediction
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[contracttype]
-pub enum Outcome {
-  Undecided,
-  TrueOutcome,
-  FalseOutcome,
+pub enum Status {
+  Initial,
+  Ready,
+  InProgress,
+  Ended,
+  Paused,
 }
 #[contracttype]
 #[derive(Clone, Debug)]
@@ -58,15 +63,4 @@ pub struct Bets {
   pub amount: u128,
   pub bet_on_true: bool,
   pub claimed: bool,
-}
-
-#[contracttype]
-pub enum StorageKey {
-  Oracle,
-  Token,
-  TrueTotal,
-  FalseTotal,
-  Market,
-  State,
-  Bets(Address),
 }

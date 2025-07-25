@@ -47,20 +47,36 @@ fn setup(
   let token_id = token.address.clone();
   let market_name = String::from_str(&env, "prediction");
   let (ctrt_id, ctrt) = new_ctrt(&env, admin.clone(), token_id.clone(), market_name);
+  env.mock_all_auths();
 
-  asset.mint(&user1, &1000);
-  asset.mint(&user2, &2000);
+  let init_balc = 1_000_i128;
+  asset.mint(&user1, &init_balc);
+  asset.mint(&user2, &init_balc);
+  token.approve(&user1, &ctrt_id, &init_balc, &100);
+  token.approve(&user2, &ctrt_id, &init_balc, &100);
   (ctrt, ctrt_id, token, token_id, admin, user1, user2)
+}
+#[test]
+fn test_init_conditions() {
+  let env = Env::default();
+  let (ctrt, ctrt_id, token, token_id, admin, user1, user2) = setup(&env);
+
+  let state = ctrt.get_state();
+  ll!("state: {:?}", state);
+  assert_eq!(state.count, 0);
+  assert_eq!(state.admin, admin);
+  assert_eq!(state.token, token_id);
+  assert_eq!(state.market_name, String::from_str(&env, "prediction"));
+  assert_eq!(state.status, Status::Initial);
+
+  assert_eq!(token.balance(&user1), 1000);
+  assert_eq!(token.balance(&user2), 1000);
+  assert_eq!(token.balance(&ctrt_id), 0);
 }
 #[test]
 fn test_token() {
   let env = Env::default();
-  env.mock_all_auths();
   let (ctrt, ctrt_id, token, token_id, _admin, user1, user2) = setup(&env);
-
-  assert_eq!(token.balance(&user1), 1000);
-  assert_eq!(token.balance(&user2), 2000);
-  assert_eq!(token.balance(&ctrt_id), 0);
 
   let user_id = symbol_short!("user1");
   let out1 = ctrt.add_user(&user1, &user_id);
@@ -68,7 +84,6 @@ fn test_token() {
   let user1u = ctrt.get_user(&user1);
   assert_eq!(user1u.id, user_id);
 
-  ctrt.approve_token(&token_id, &user1, &700, &100);
   ctrt.deposit_token(&token_id, &user1, &700);
   assert_eq!(token.balance(&user1), 300);
   assert_eq!(token.balance(&ctrt_id), 700);
@@ -90,7 +105,6 @@ fn test_token() {
 #[test]
 fn test_state() {
   let env = Env::default();
-  env.mock_all_auths();
   let (ctrt, ctrt_id, _, _, _, _, _) = setup(&env);
 
   let state = ctrt.get_state();
@@ -125,7 +139,6 @@ fn test_state() {
 #[test]
 fn testf_max_count() {
   let env = Env::default();
-  env.mock_all_auths();
   let (ctrt, _, _, _, _, _, _) = setup(&env);
 
   ll!("testf_max_count");
@@ -139,7 +152,6 @@ fn testf_max_count() {
 #[should_panic(expected = "HostError: Error(Contract, #1)")]
 fn testf_max_count2() {
   let env = Env::default();
-  env.mock_all_auths();
   let (ctrt, _, _, _, _, _, _) = setup(&env);
 
   assert_eq!(ctrt.increment(&5), 5);
