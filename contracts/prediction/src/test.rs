@@ -19,9 +19,9 @@ fn new_token_ctrt<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, TokenAdminC
     token::StellarAssetClient::new(e, &sac.address()),
   )
 }
-fn new_hello(e: &Env) -> (Address, HelloClient) {
-  let contract_id = e.register(Hello, ());
-  let client = HelloClient::new(e, &contract_id);
+fn new_ctrt(e: &Env) -> (Address, PredictionClient) {
+  let contract_id = e.register(Prediction, ());
+  let client = PredictionClient::new(e, &contract_id);
   (contract_id, client)
 }
 
@@ -34,7 +34,7 @@ fn test_token() {
   let user1 = Address::generate(&env);
   let user2 = Address::generate(&env);
   let (token, asset) = new_token_ctrt(&env, &admin);
-  let (contract_id, client) = new_hello(&env);
+  let (contract_id, client) = new_ctrt(&env);
 
   asset.mint(&user1, &1000);
   asset.mint(&user2, &2000);
@@ -71,7 +71,7 @@ fn test_token() {
 #[test]
 fn test_get_state() {
   let env = Env::default();
-  let (contract_id, client) = new_hello(&env);
+  let (contract_id, client) = new_ctrt(&env);
 
   assert_eq!(client.increment(&3), 3);
   assert_eq!(
@@ -99,9 +99,9 @@ fn test_get_state() {
 }
 
 #[test]
-fn test_fail1() {
+fn testf_max_count() {
   let env = Env::default();
-  let (_, client) = new_hello(&env);
+  let (_, client) = new_ctrt(&env);
   ll!("test_fail1");
   //log!(&env, "state.count: {:?}", "John");
   assert_eq!(client.increment(&5), 5);
@@ -111,19 +111,12 @@ fn test_fail1() {
 }
 #[test]
 #[should_panic(expected = "HostError: Error(Contract, #1)")]
-fn test_fail2() {
+fn testf_max_count2() {
   let env = Env::default();
-  let (_, client) = new_hello(&env);
+  let (_, client) = new_ctrt(&env);
 
   assert_eq!(client.increment(&5), 5);
   let state = client.get_state();
   assert_eq!(state.count, 5);
   client.increment(&1);
-}
-#[test]
-#[should_panic(expected = "HostError: Error(Contract, #1)")]
-fn test_debugging() {
-  let env = Env::default();
-  let (_, client) = new_hello(&env);
-  client.debugging(&1);
 }

@@ -1,20 +1,16 @@
 #![no_std]
 use sep_41_token::TokenClient;
-use soroban_sdk::{
-  contract, contractimpl, log, panic_with_error, symbol_short, token, Address, Env, Symbol,
-};
+use soroban_sdk::{contract, contractimpl, log, symbol_short, token, Address, Env, Symbol};
 
-use crate::types::{Error, Registry, State, User, STATE};
+use crate::types::{Error, Registry, State, User, MAX_COUNT, STATE};
 mod types;
-
-const MAX_COUNT: u32 = 5;
 
 //TODO: simpleAccount
 #[contract]
-pub struct Hello;
+pub struct Prediction;
 
 #[contractimpl]
-impl Hello {
+impl Prediction {
   pub fn approve_token(
     env: Env,
     token: Address,
@@ -165,18 +161,12 @@ impl Hello {
         .publish((STATE, symbol_short!("increment")), state.count);
       Ok(state.count)
     } else {
+      log!(&env, "failure here!");
       Err(Error::MaxCountReached)
+      //panic_with_error!(&env, Error::MaxCountReached);
     }
   }
-  pub fn debugging(env: Env, value: u32) -> u32 {
-    match value {
-      0 => 0,
-      _ => {
-        log!(&env, "fail");
-        panic_with_error!(&env, Error::MaxCountReached);
-      }
-    }
-  }
+
   pub fn reset_count(env: Env, value: u32) -> Result<u32, Error> {
     let mut state = Self::get_state(env.clone());
     log!(&env, "reset_count: {}", state);

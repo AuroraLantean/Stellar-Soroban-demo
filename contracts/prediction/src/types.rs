@@ -1,4 +1,6 @@
 use soroban_sdk::{contracterror, contracttype, symbol_short, Address, Symbol};
+
+//----------== Error
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
@@ -10,6 +12,8 @@ pub enum Error {
   InsufficientAllowance = 5,
   BalanceExists = 6,
 }
+//----------== Config
+pub const MAX_COUNT: u32 = 5;
 //----------== Bank
 pub const STATE: Symbol = symbol_short!("STATE");
 #[contracttype]
@@ -40,6 +44,7 @@ pub enum Outcome {
   FalseOutcome,
 }
 #[contracttype]
+#[derive(Clone, Debug)]
 pub struct Bets {
   pub bettor: Address,
   pub amount: i128,
