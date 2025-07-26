@@ -176,7 +176,98 @@ impl Prediction {
     env.storage().persistent().set(&key, &game);
     Ok(0u32)
   }
+  pub fn bet(
+    env: Env,
+    user: Address,
+    game_id: u32,
+    amount_u128: u128,
+    bet_index: u32,
+  ) -> Result<u32, Error> {
+    log!(&env, "bet");
+    user.require_auth();
+    let amount: i128 = amount_u128.try_into().unwrap();
+    let state = Self::get_state(env.clone())?;
+    log!(&env, "bet: {}", state);
+    assert_eq!(state.status, Status::Active, "not active");
 
+    if amount <= 0 {
+      panic!("amount invalid");
+    }
+    let ctrt_id = env.current_contract_address();
+
+    let token = token::Client::new(&env, &state.token);
+    let sender_balance = token.balance(&user);
+    if sender_balance < amount {
+      return Err(Error::InsufficientBalance);
+    }
+    let allowance = token.allowance(&user, &ctrt_id);
+    if allowance < amount {
+      return Err(Error::InsufficientAllowance);
+    }
+
+    //check game_id
+    log!(&env, "get game");
+    let time = env.ledger().timestamp();
+    log!(&env, "time: {}", time);
+
+    let key = Registry::Games(game_id);
+    let game_opt: Option<Game> = env.storage().persistent().get(&key);
+    if game_opt.is_none() {
+      return Err(Error::GameDoesNotExist);
+    }
+    let mut game = game_opt.unwrap();
+    if time < game.time_start {
+      return Err(Error::BeforeStartTime);
+    } //TODO: time travel
+    if time > game.time_end {
+      return Err(Error::AfterEndTime);
+    }
+    let balc_opt = game.balances.get(bet_index);
+    if balc_opt.is_none() {
+      return Err(Error::GameBalcInvalid);
+    }
+    let balc = balc_opt.unwrap();
+    game.balances.set(bet_index, balc + amount_u128);
+    env.storage().persistent().set(&key, &game);
+
+    log!(&env, "get bet");
+    if bet_index > 3 {
+      return Err(Error::BetIndexInvalid);
+    }
+    let key = Registry::Bets(user.clone(), game_id);
+    let bet_opt: Option<Bet> = env.storage().persistent().get(&key);
+
+    let bet = if let Some(mut bet) = bet_opt {
+      let prev_amt_opt = bet.bet_values.get(bet_index);
+      if prev_amt_opt.is_none() {
+        return Err(Error::BetValueInvalid);
+      }
+      bet
+        .bet_values
+        .set(bet_index, prev_amt_opt.unwrap() + amount_u128);
+      bet
+    } else {
+      let mut bet_values: Vec<u128> = vec![&env, 0, 0, 0, 0];
+      bet_values.set(bet_index, amount_u128);
+      Bet {
+        bet_values: bet_values,
+        claimed: false,
+      }
+    };
+    //log!(&env, "bet:{:?}", bet);
+    env.storage().persistent().set(&key, &bet);
+    env
+      .storage()
+      .persistent()
+      .extend_ttl(&key, 50, env.storage().max_ttl());
+
+    token.transfer_from(&ctrt_id, &user, &ctrt_id, &amount);
+    Ok(0u32)
+  }
+
+  pub fn settle(_env: Env, admin: Address) {
+    admin.require_auth();
+  }
   pub fn increment(env: Env, incr: u32) -> Result<u32, Error> {
     let mut state = Self::get_state(env.clone())?;
     log!(&env, "increment: {}", state);

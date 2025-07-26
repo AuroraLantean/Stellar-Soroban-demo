@@ -90,11 +90,11 @@ fn test_token() {
   assert_eq!(user1u.id, user_id);
 
   ctrt.deposit_token(&token_id, &user1, &700);
-  assert_eq!(token.balance(&user1), 300);
+  assert_eq!(token.balance(&user1), INITBALC - 700);
   assert_eq!(token.balance(&ctrt_addr), 700);
 
   ctrt.withdraw_token(&token_id, &user1, &500);
-  assert_eq!(token.balance(&user1), 800);
+  assert_eq!(token.balance(&user1), INITBALC - 200);
   assert_eq!(token.balance(&ctrt_addr), 200);
 
   let user1u = ctrt.get_user(&user1);
@@ -154,7 +154,7 @@ fn testf_max_count() {
   //ll!("{}", env.logs().all().join("\n"));
 }
 #[test]
-#[should_panic(expected = "HostError: Error(Contract, #1)")]
+#[should_panic(expected = "HostError: Error(Contract, #16)")] //depending on Error enum index
 fn testf_max_count2() {
   let env = Env::default();
   let (ctrt, _, _, _, _, _, _) = setup(&env);
