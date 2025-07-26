@@ -12,6 +12,8 @@ use soroban_sdk::{
 extern crate std;
 use std::println as ll;
 
+const INITBALC: i128 = 9_000_i128;
+
 fn new_token_ctrt<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, TokenAdminClient<'a>) {
   let sac = e.register_stellar_asset_contract_v2(admin.clone());
   (
@@ -25,9 +27,9 @@ fn new_ctrt(
   token: Address,
   market_name: String,
 ) -> (Address, PredictionClient) {
-  let contract_id = e.register(Prediction, (admin, token, market_name));
-  let client = PredictionClient::new(e, &contract_id);
-  (contract_id, client)
+  let ctrt_addr = e.register(Prediction, (admin, token, market_name));
+  let client = PredictionClient::new(e, &ctrt_addr);
+  (ctrt_addr, client)
 }
 fn setup(
   env: &Env,
@@ -46,20 +48,19 @@ fn setup(
   let (token, asset) = new_token_ctrt(&env, &admin);
   let token_id = token.address.clone();
   let market_name = String::from_str(&env, "prediction");
-  let (ctrt_id, ctrt) = new_ctrt(&env, admin.clone(), token_id.clone(), market_name);
+  let (ctrt_addr, ctrt) = new_ctrt(&env, admin.clone(), token_id.clone(), market_name);
   env.mock_all_auths();
 
-  let init_balc = 1_000_i128;
-  asset.mint(&user1, &init_balc);
-  asset.mint(&user2, &init_balc);
-  token.approve(&user1, &ctrt_id, &init_balc, &100);
-  token.approve(&user2, &ctrt_id, &init_balc, &100);
-  (ctrt, ctrt_id, token, token_id, admin, user1, user2)
+  asset.mint(&user1, &INITBALC);
+  asset.mint(&user2, &INITBALC);
+  token.approve(&user1, &ctrt_addr, &INITBALC, &100);
+  token.approve(&user2, &ctrt_addr, &INITBALC, &100);
+  (ctrt, ctrt_addr, token, token_id, admin, user1, user2)
 }
 #[test]
 fn test_init_conditions() {
   let env = Env::default();
-  let (ctrt, ctrt_id, token, token_id, admin, user1, user2) = setup(&env);
+  let (ctrt, ctrt_addr, token, token_id, admin, user1, user2) = setup(&env);
 
   let state = ctrt.get_state();
   ll!("state: {:?}", state);
@@ -68,15 +69,19 @@ fn test_init_conditions() {
   assert_eq!(state.token, token_id);
   assert_eq!(state.market_name, String::from_str(&env, "prediction"));
   assert_eq!(state.status, Status::Initial);
+  assert_eq!(token.balance(&user1), INITBALC);
+  assert_eq!(token.balance(&user2), INITBALC);
+  assert_eq!(token.allowance(&user1, &ctrt_addr), INITBALC);
+  assert_eq!(token.allowance(&user2, &ctrt_addr), INITBALC);
+  assert_eq!(token.balance(&ctrt_addr), 0);
 
-  assert_eq!(token.balance(&user1), 1000);
-  assert_eq!(token.balance(&user2), 1000);
-  assert_eq!(token.balance(&ctrt_id), 0);
+  token.transfer(&user1, &user2, &137);
+  assert_eq!(token.balance(&user1), INITBALC - 137);
 }
 #[test]
 fn test_token() {
   let env = Env::default();
-  let (ctrt, ctrt_id, token, token_id, _admin, user1, user2) = setup(&env);
+  let (ctrt, ctrt_addr, token, token_id, _admin, user1, _user2) = setup(&env);
 
   let user_id = symbol_short!("user1");
   let out1 = ctrt.add_user(&user1, &user_id);
@@ -86,11 +91,11 @@ fn test_token() {
 
   ctrt.deposit_token(&token_id, &user1, &700);
   assert_eq!(token.balance(&user1), 300);
-  assert_eq!(token.balance(&ctrt_id), 700);
+  assert_eq!(token.balance(&ctrt_addr), 700);
 
   ctrt.withdraw_token(&token_id, &user1, &500);
   assert_eq!(token.balance(&user1), 800);
-  assert_eq!(token.balance(&ctrt_id), 200);
+  assert_eq!(token.balance(&ctrt_addr), 200);
 
   let user1u = ctrt.get_user(&user1);
   ll!("user1u: {:?}", user1u);
@@ -105,7 +110,7 @@ fn test_token() {
 #[test]
 fn test_state() {
   let env = Env::default();
-  let (ctrt, ctrt_id, _, _, _, _, _) = setup(&env);
+  let (ctrt, ctrt_addr, _, _, _, _, _) = setup(&env);
 
   let state = ctrt.get_state();
   ll!("state: {:?}", state);
@@ -117,7 +122,7 @@ fn test_state() {
     vec![
       &env,
       (
-        ctrt_id.clone(),
+        ctrt_addr.clone(),
         (symbol_short!("STATE"), symbol_short!("increment")).into_val(&env),
         3u32.into_val(&env)
       ),

@@ -1,5 +1,3 @@
-use core::ops::Add;
-
 use soroban_sdk::{contracterror, contracttype, symbol_short, Address, String, Symbol, Vec};
 
 //----------== Error
@@ -7,13 +5,21 @@ use soroban_sdk::{contracterror, contracttype, symbol_short, Address, String, Sy
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum Error {
-  MaxCountReached = 1,
-  UserExists = 2,
-  UserDoesNotExist = 3,
-  InsufficientBalance = 4,
-  InsufficientAllowance = 5,
-  BalanceExists = 6,
-  StateNotInitialized = 7,
+  StateNotInitialized = 1,
+  InsufficientBalance = 2,
+  InsufficientAllowance = 3,
+  UserExists = 4,
+  UserDoesNotExist = 6,
+  UserBalanceExists = 7,
+  GameDoesNotExist = 8,
+  GameAdminUnauthorized = 9,
+  GameBalcInvalid = 10,
+  BeforeStartTime = 11,
+  AfterEndTime = 12,
+  BetDoesNotExist = 13,
+  BetIndexInvalid = 14,
+  BetValueInvalid = 15,
+  MaxCountReached = 16,
 }
 //----------== Config
 pub const MAX_COUNT: u32 = 5;
@@ -35,7 +41,8 @@ pub struct State {
 #[contracttype]
 pub enum Registry {
   Users(Address),
-  Bets(Address, Address),
+  Games(u32),         // game_id
+  Bets(Address, u32), //user, game_id
 }
 //if env.storage().instance().has(&DataKey::Owner) {  panic!("owner is already set"); }
 #[contracttype]
@@ -47,20 +54,26 @@ pub struct User {
   pub updated_at: u64,
 }
 //----------== Prediction
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct Game {
+  pub game_admin: Address,
+  pub balances: Vec<u128>, //[u128; 4],
+  pub time_start: u64,
+  pub time_end: u64,
+}
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct Bet {
+  pub bet_values: Vec<u128>, //[u128; 4],
+  pub claimed: bool,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[contracttype]
 pub enum Status {
   Initial,
   Ready,
-  InProgress,
+  Active,
   Ended,
   Paused,
-}
-#[contracttype]
-#[derive(Clone, Debug)]
-pub struct Bets {
-  pub bettor: Address,
-  pub amount: u128,
-  pub bet_on_true: bool,
-  pub claimed: bool,
 }

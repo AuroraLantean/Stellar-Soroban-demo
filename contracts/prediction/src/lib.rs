@@ -1,10 +1,10 @@
 #![no_std]
 use sep_41_token::TokenClient;
 use soroban_sdk::{
-  contract, contractimpl, log, symbol_short, token, vec, Address, Env, String, Symbol,
+  contract, contractimpl, log, symbol_short, token, vec, Address, Env, String, Symbol, Vec,
 };
 
-use crate::types::{Error, Registry, State, Status, User, MAX_COUNT, STATE};
+use crate::types::{Bet, Error, Game, Registry, State, Status, User, MAX_COUNT, STATE};
 mod types;
 
 //TODO: simpleAccount
@@ -101,22 +101,6 @@ impl Prediction {
     token.transfer(&ctrt_addr, &sender, &amount_i128);
     Ok(0u32)
   }
-  pub fn admin_func(_env: Env, admin: Address) {
-    admin.require_auth();
-    //TODO
-  }
-  pub fn balance_allowance(
-    env: Env,
-    token: Address,
-    target: Address,
-  ) -> Result<(i128, i128), Error> {
-    log!(&env, "balance_allowance");
-    let token = token::Client::new(&env, &token);
-    let ctrt_addr = env.current_contract_address();
-    let balance = token.balance(&target);
-    let allowance = token.allowance(&target, &ctrt_addr);
-    Ok((balance, allowance))
-  }
 
   pub fn get_user(env: Env, addr: Address) -> Result<User, Error> {
     log!(&env, "get_user");
@@ -147,9 +131,49 @@ impl Prediction {
   pub fn delete_user(env: Env, addr: Address) -> Result<u32, Error> {
     let user = Self::get_user(env.clone(), addr.clone())?;
     if user.balance > 0 {
-      return Err(Error::BalanceExists);
+      return Err(Error::UserBalanceExists);
     }
     env.storage().persistent().remove(&user);
+    Ok(0u32)
+  }
+
+  pub fn set_game(
+    env: Env,
+    game_admin: Address,
+    game_id: u32,
+    time_start: u64,
+    time_end: u64,
+    //prices: Vec<u128>, //[u128; 4],
+  ) -> Result<u32, Error> {
+    log!(&env, "setup_game");
+    game_admin.require_auth();
+    let time = env.ledger().timestamp();
+    //log!(&env, "time: {}", time);
+
+    let key = Registry::Games(game_id);
+    let game_opt: Option<Game> = env.storage().persistent().get(&key);
+    let game = if let Some(mut prev) = game_opt {
+      if prev.game_admin != game_admin {
+        return Err(Error::GameAdminUnauthorized);
+      }
+      if time > prev.time_end {
+        prev.balances = vec![&env, 0, 0, 0, 0];
+      }
+      prev.time_start = time_start;
+      prev.time_end = time_end;
+      prev
+    } else {
+      if time > time_end {
+        return Err(Error::AfterEndTime);
+      }
+      Game {
+        game_admin,
+        balances: vec![&env, 0, 0, 0, 0],
+        time_start,
+        time_end,
+      }
+    };
+    env.storage().persistent().set(&key, &game);
     Ok(0u32)
   }
 
