@@ -148,7 +148,7 @@ impl Prediction {
     log!(&env, "setup_game");
     game_admin.require_auth();
     let time = env.ledger().timestamp();
-    //log!(&env, "time: {}", time);
+    log!(&env, "time: {}", time);
 
     let key = Registry::Games(game_id);
     let game_opt: Option<Game> = env.storage().persistent().get(&key);
@@ -176,6 +176,11 @@ impl Prediction {
     env.storage().persistent().set(&key, &game);
     Ok(0u32)
   }
+  pub fn get_game(env: Env, game_id: u32) -> Option<Game> {
+    let key = Registry::Games(game_id);
+    let game_opt: Option<Game> = env.storage().persistent().get(&key);
+    game_opt
+  }
   pub fn bet(
     env: Env,
     user: Address,
@@ -188,7 +193,7 @@ impl Prediction {
     let amount: i128 = amount_u128.try_into().unwrap();
     let state = Self::get_state(env.clone())?;
     log!(&env, "bet: {}", state);
-    assert_eq!(state.status, Status::Active, "not active");
+    //assert_eq!(state.status, Status::Active, "not active");
 
     if amount <= 0 {
       panic!("amount invalid");
@@ -264,7 +269,11 @@ impl Prediction {
     token.transfer_from(&ctrt_id, &user, &ctrt_id, &amount);
     Ok(0u32)
   }
-
+  pub fn get_bet(env: Env, user: Address, game_id: u32) -> Option<Bet> {
+    let key = Registry::Bets(user, game_id);
+    let bet_opt: Option<Bet> = env.storage().persistent().get(&key);
+    bet_opt
+  }
   pub fn settle(_env: Env, admin: Address) {
     admin.require_auth();
   }
@@ -304,9 +313,6 @@ impl Prediction {
     Ok(state.count)
   }
   pub fn get_state(env: Env) -> Result<State, Error> {
-    let time = env.ledger().timestamp();
-    log!(&env, "time: {}", time);
-    //vec![&env, String::from_str(&env, "Hello"), nameString] // -> Vec<String>
     let state_opt = env.storage().persistent().get(&STATE);
     if state_opt.is_none() {
       return Err(Error::StateNotInitialized);

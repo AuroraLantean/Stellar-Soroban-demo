@@ -10,8 +10,11 @@ use soroban_sdk::{
   vec, Address, Env, IntoVal,
 }; //Logs
 extern crate std;
+use core::fmt::Debug;
 use std::println as ll;
-
+fn llc<T: Debug>(name: &str, input: T) {
+  ll!("\x1b[32m {}: {:?}\x1b[0m", name, input);
+}
 const INITBALC: i128 = 9_000_i128;
 
 fn new_token_ctrt<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, TokenAdminClient<'a>) {
@@ -106,6 +109,46 @@ fn test_token() {
   let user1u = ctrt.get_user(&user1);
   ll!("user1u: {:?}", user1u);
   assert_eq!(user1u.updated_at, 0);
+}
+
+#[test]
+fn test_game() {
+  let env = Env::default();
+  let (ctrt, ctrt_addr, token, _token_id, _admin, user1, _user2) = setup(&env);
+  let game_id = 1;
+  let time_start = 0u64;
+  let time_end = 100u64;
+  let game = ctrt.get_game(&game_id);
+  llc("game", game);
+  ctrt.set_game(&user1, &game_id, &time_start, &time_end);
+
+  let amount = 100u128;
+  let bet_index = 0u32;
+
+  let game = ctrt.get_game(&game_id);
+  let game_balc1 = game.clone().unwrap().balances.get(bet_index).unwrap();
+  llc("game", game);
+
+  let bet = ctrt.get_bet(&user1, &game_id);
+  llc("bet", bet.clone());
+  let bet_balc1 = 0;
+
+  ctrt.bet(&user1, &game_id, &amount, &bet_index);
+  let bet = ctrt.get_bet(&user1, &game_id);
+  llc("bet", bet.clone());
+  assert_eq!(
+    bet_balc1 + amount,
+    bet.unwrap().bet_values.get(bet_index).unwrap()
+  );
+  let game = ctrt.get_game(&game_id);
+  llc("game", game.clone());
+  assert_eq!(
+    game_balc1 + amount,
+    game.unwrap().balances.get(bet_index).unwrap()
+  );
+  let balc1 = token.balance(&ctrt_addr);
+  llc("ctrt balc:", balc1.clone());
+  assert_eq!(balc1.cast_unsigned(), amount);
 }
 #[test]
 fn test_state() {
