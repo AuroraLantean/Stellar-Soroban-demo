@@ -20,6 +20,8 @@ pub enum Error {
   GameNumberInvalid = 34,
   BeforeStartTime = 35,
   AfterEndTime = 36,
+  BeforeEndTime = 37,
+  EndTimeTooSmall = 38,
   BetDoesNotExist = 40,
   BetIndexInvalid = 41,
   BetValueInvalid = 42,
@@ -62,6 +64,7 @@ pub struct Game {
   pub game_admin: Address,
   pub time_start: u64,
   pub time_end: u64,
+  pub commission_rate: u128,
   pub status: Status,
   pub values: Vec<u128>,
   pub numbers: Vec<u128>,
@@ -76,8 +79,7 @@ pub struct Bet {
 #[contracttype]
 pub enum Status {
   Initial,
-  Ready,
   Active,
-  Ended,
+  Settled,
   Paused,
 }

@@ -90,7 +90,6 @@ impl Prediction {
     //log!(&env, "user:{:?}", user);
     let key = Registry::Users(sender.clone());
     env.storage().persistent().set(&key, &user);
-
     env
       .storage()
       .persistent()
@@ -141,10 +140,13 @@ impl Prediction {
     game_id: u32,
     time_start: u64,
     time_end: u64,
-    //prices: Vec<u128>, //[u128; 4],
+    commission_rate: u128, //0.1% as 1
   ) -> Result<u32, Error> {
     log!(&env, "setup_game");
     game_admin.require_auth();
+    if time_end <= time_start {
+      return Err(Error::EndTimeTooSmall);
+    }
     let time = env.ledger().timestamp();
     log!(&env, "time: {}", time);
 
@@ -154,11 +156,17 @@ impl Prediction {
       if prev.game_admin != game_admin {
         return Err(Error::GameAdminUnauthorized);
       }
-      if time > prev.time_end {
-        prev.values = vec![&env, 0, 0, 0, 0];
+      if time < prev.time_end {
+        return Err(Error::BeforeEndTime);
+      }
+      if prev.status != Status::Settled {
+        return Err(Error::GameStatusInvalid);
       }
       prev.time_start = time_start;
       prev.time_end = time_end;
+      prev.status = Status::Active;
+      prev.values = vec![&env, 0, 0, 0, 0];
+      prev.numbers = vec![&env, 0, 0, 0, 0];
       prev
     } else {
       if time > time_end {
@@ -168,12 +176,17 @@ impl Prediction {
         game_admin,
         time_start,
         time_end,
+        commission_rate,
         status: Status::Active,
         values: vec![&env, 0, 0, 0, 0],
         numbers: vec![&env, 0, 0, 0, 0],
       }
     };
     env.storage().persistent().set(&key, &game);
+    env
+      .storage()
+      .persistent()
+      .extend_ttl(&key, 50, env.storage().max_ttl());
     Ok(0u32)
   }
   pub fn get_game(env: Env, game_id: u32) -> Option<Game> {
@@ -194,11 +207,14 @@ impl Prediction {
     if amount <= 0 {
       panic!("amount invalid");
     }
+    if bet_index > 3 {
+      panic!("bet index out of bound");
+    }
     let ctrt_addr = env.current_contract_address();
 
     //check state
     let state = Self::get_state(env.clone())?;
-    log!(&env, "bet: {}", state);
+    log!(&env, "state: {}", state);
     if state.status != Status::Active {
       return Err(Error::StateStatusInvalid);
     };
@@ -229,10 +245,11 @@ impl Prediction {
     }
     if time < game.time_start {
       return Err(Error::BeforeStartTime);
-    } //TODO: time travel
-    if time > game.time_end {
+    } //TODO: test on time travel
+    if time >= game.time_end {
       return Err(Error::AfterEndTime);
     }
+    //add Game value
     let value_opt = game.values.get(bet_index);
     if value_opt.is_none() {
       return Err(Error::GameValueInvalid);
@@ -240,6 +257,7 @@ impl Prediction {
     let value = value_opt.unwrap();
     game.values.set(bet_index, value + value128);
 
+    //add Game number
     let number_opt = game.numbers.get(bet_index);
     if number_opt.is_none() {
       return Err(Error::GameNumberInvalid);
@@ -249,6 +267,7 @@ impl Prediction {
 
     env.storage().persistent().set(&key, &game);
 
+    // get_bat
     log!(&env, "get bet");
     if bet_index > 3 {
       return Err(Error::BetIndexInvalid);
@@ -256,14 +275,13 @@ impl Prediction {
     let key = Registry::Bets(user.clone(), game_id);
     let bet_opt: Option<Bet> = env.storage().persistent().get(&key);
 
+    //add bet
     let bet = if let Some(mut bet) = bet_opt {
-      let prev_amt_opt = bet.bet_values.get(bet_index);
-      if prev_amt_opt.is_none() {
+      let value_opt = bet.bet_values.get(bet_index);
+      if value_opt.is_none() {
         return Err(Error::BetValueInvalid);
       }
-      bet
-        .bet_values
-        .set(bet_index, prev_amt_opt.unwrap() + value128);
+      bet.bet_values.set(bet_index, value_opt.unwrap() + value128);
       bet
     } else {
       let mut bet_values: Vec<u128> = vec![&env, 0, 0, 0, 0];
@@ -273,25 +291,90 @@ impl Prediction {
         claimed: false,
       }
     };
-
     //log!(&env, "bet:{:?}", bet);
+    //save bet
     env.storage().persistent().set(&key, &bet);
     env
       .storage()
       .persistent()
       .extend_ttl(&key, 50, env.storage().max_ttl());
-
+    //transfer token
     token.transfer_from(&ctrt_addr, &user, &ctrt_addr, &amount);
     Ok(0u32)
   }
+
   pub fn get_bet(env: Env, user: Address, game_id: u32) -> Option<Bet> {
     let key = Registry::Bets(user, game_id);
     let bet_opt: Option<Bet> = env.storage().persistent().get(&key);
     bet_opt
   }
-  pub fn settle(_env: Env, admin: Address) {
+
+  pub fn settle(env: Env, admin: Address, game_id: u32, vault: Address) -> Result<u32, Error> {
+    log!(&env, "settle");
     admin.require_auth();
+    let time = env.ledger().timestamp();
+    log!(&env, "time: {}", time);
+
+    //check and end game
+    let key = Registry::Games(game_id);
+    let game_opt: Option<Game> = env.storage().persistent().get(&key);
+    if game_opt.is_none() {
+      return Err(Error::GameDoesNotExist);
+    }
+    let mut game = game_opt.unwrap();
+    if admin != game.game_admin {
+      return Err(Error::GameAdminUnauthorized);
+    }
+    if time < game.time_end {
+      return Err(Error::BeforeEndTime);
+    }
+    if game.status != Status::Active && game.status != Status::Paused {
+      return Err(Error::GameStatusInvalid);
+    }
+    game.status = Status::Settled;
+    //game.time_start = 0;
+    //game.time_end = 0;
+
+    //calculate commission
+    let game_value_sum = game.values.iter().sum::<u128>();
+    log!(&env, "game_value_sum: {}", game_value_sum);
+    let numerator = game_value_sum
+      .checked_mul(game.commission_rate)
+      .expect("numerator"); //reduce commision rate when this error happens
+    let commission_fee = numerator.div_ceil(1000); //rounding up here may balance users' rounding down
+    log!(&env, "commission_fee: {}", commission_fee);
+
+    game.values = vec![&env, 0, 0, 0, 0];
+    game.numbers = vec![&env, 0, 0, 0, 0];
+    env.storage().persistent().set(&key, &game);
+    env
+      .storage()
+      .persistent()
+      .extend_ttl(&key, 50, env.storage().max_ttl());
+
+    //check token amount
+    let ctrt_addr = env.current_contract_address();
+
+    //check state
+    let state = Self::get_state(env.clone())?;
+    log!(&env, "state: {}", state);
+    let token = token::Client::new(&env, &state.token);
+    let balc = token.balance(&ctrt_addr);
+    let fee = commission_fee.cast_signed();
+    if balc < fee {
+      return Err(Error::InsufficientBalance);
+    }
+    token.transfer(&ctrt_addr, &vault, &fee);
+    Ok(0u32)
   }
+  /*pub struct Game {
+    pub game_admin: Address,
+    pub time_start: u64,
+    pub time_end: u64,
+    pub status: Status,
+    pub values: Vec<u128>,
+    pub numbers: Vec<u128>,
+  } */
   pub fn increment(env: Env, incr: u32) -> Result<u32, Error> {
     let mut state = Self::get_state(env.clone())?;
     log!(&env, "increment: {}", state);
