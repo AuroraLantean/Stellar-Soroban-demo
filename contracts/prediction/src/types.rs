@@ -5,21 +5,25 @@ use soroban_sdk::{contracterror, contracttype, symbol_short, Address, String, Sy
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum Error {
-  StateNotInitialized = 1,
+  AmountInvalid = 1,
   InsufficientBalance = 2,
   InsufficientAllowance = 3,
-  UserExists = 4,
-  UserDoesNotExist = 6,
-  UserBalanceExists = 7,
-  GameDoesNotExist = 8,
-  GameAdminUnauthorized = 9,
-  GameBalcInvalid = 10,
-  BeforeStartTime = 11,
-  AfterEndTime = 12,
-  BetDoesNotExist = 13,
-  BetIndexInvalid = 14,
-  BetValueInvalid = 15,
-  MaxCountReached = 16,
+  StateNotInitialized = 10,
+  StateStatusInvalid = 11,
+  UserExists = 21,
+  UserDoesNotExist = 22,
+  UserBalanceExists = 23,
+  GameDoesNotExist = 30,
+  GameAdminUnauthorized = 31,
+  GameStatusInvalid = 32,
+  GameValueInvalid = 33,
+  GameNumberInvalid = 34,
+  BeforeStartTime = 35,
+  AfterEndTime = 36,
+  BetDoesNotExist = 40,
+  BetIndexInvalid = 41,
+  BetValueInvalid = 42,
+  MaxCountReached = 43,
 }
 //----------== Config
 pub const MAX_COUNT: u32 = 5;
@@ -34,8 +38,6 @@ pub struct State {
   pub token: Address,
   pub market_name: String,
   pub status: Status,
-  pub bet_values: Vec<u128>,
-  pub bet_numbers: Vec<u128>,
 }
 
 #[contracttype]
@@ -58,9 +60,11 @@ pub struct User {
 #[derive(Clone, Debug)]
 pub struct Game {
   pub game_admin: Address,
-  pub balances: Vec<u128>, //[u128; 4],
   pub time_start: u64,
   pub time_end: u64,
+  pub status: Status,
+  pub values: Vec<u128>,
+  pub numbers: Vec<u128>,
 }
 #[contracttype]
 #[derive(Clone, Debug)]

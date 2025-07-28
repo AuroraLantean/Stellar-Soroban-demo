@@ -71,7 +71,7 @@ fn test_init_conditions() {
   assert_eq!(state.admin, admin);
   assert_eq!(state.token, token_id);
   assert_eq!(state.market_name, String::from_str(&env, "prediction"));
-  assert_eq!(state.status, Status::Initial);
+  assert_eq!(state.status, Status::Active);
   assert_eq!(token.balance(&user1), INITBALC);
   assert_eq!(token.balance(&user2), INITBALC);
   assert_eq!(token.allowance(&user1, &ctrt_addr), INITBALC);
@@ -122,33 +122,44 @@ fn test_game() {
   llc("game", game);
   ctrt.set_game(&user1, &game_id, &time_start, &time_end);
 
-  let amount = 100u128;
+  let value = 100u128;
   let bet_index = 0u32;
 
   let game = ctrt.get_game(&game_id);
-  let game_balc1 = game.clone().unwrap().balances.get(bet_index).unwrap();
+  let game_value = game.clone().unwrap().values.get(bet_index).unwrap();
+  let game_number = game.clone().unwrap().numbers.get(bet_index).unwrap();
   llc("game", game);
 
   let bet = ctrt.get_bet(&user1, &game_id);
   llc("bet", bet.clone());
-  let bet_balc1 = 0;
+  let bet_value = 0;
 
-  ctrt.bet(&user1, &game_id, &amount, &bet_index);
+  //user1 bets
+  llc("to bet", value);
+  ctrt.bet(&user1, &game_id, &value, &bet_index);
   let bet = ctrt.get_bet(&user1, &game_id);
-  llc("bet", bet.clone());
+  llc("after bet", bet.clone());
   assert_eq!(
-    bet_balc1 + amount,
+    bet_value + value,
     bet.unwrap().bet_values.get(bet_index).unwrap()
   );
+  //check game value
   let game = ctrt.get_game(&game_id);
   llc("game", game.clone());
   assert_eq!(
-    game_balc1 + amount,
-    game.unwrap().balances.get(bet_index).unwrap()
+    game_value + value,
+    game.clone().unwrap().values.get(bet_index).unwrap()
   );
+  //check game number
+  assert_eq!(
+    game_number + 1,
+    game.unwrap().numbers.get(bet_index).unwrap()
+  );
+
+  //check contract balance
   let balc1 = token.balance(&ctrt_addr);
   llc("ctrt balc:", balc1.clone());
-  assert_eq!(balc1.cast_unsigned(), amount);
+  assert_eq!(balc1.cast_unsigned(), value);
 }
 #[test]
 fn test_state() {
@@ -197,7 +208,7 @@ fn testf_max_count() {
   //ll!("{}", env.logs().all().join("\n"));
 }
 #[test]
-#[should_panic(expected = "HostError: Error(Contract, #16)")] //depending on Error enum index
+#[should_panic(expected = "HostError: Error(Contract, #43)")] //depending on Error enum index
 fn testf_max_count2() {
   let env = Env::default();
   let (ctrt, _, _, _, _, _, _) = setup(&env);
