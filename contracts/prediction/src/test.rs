@@ -191,9 +191,13 @@ fn test_game() {
   //check vault balance
   let balc = token.balance(&vault);
   llc("vault balc b4:", balc.clone());
-  //admin to settle
+  //game admin to settle
+  let outcome: Vec<u32> = vec![&env, 1, 0, 0, 0];
   llc("admin to settle with commission rate", commission_rate);
-  ctrt.settle(&admin, &game_id, &vault);
+  ctrt.settle(&admin, &game_id, &outcome, &vault);
+  let game = ctrt.get_game(&game_id);
+  llc("game", game.clone());
+
   let balc = token.balance(&vault);
   llc("vault balc Af:", balc.clone());
 }

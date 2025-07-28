@@ -67,7 +67,8 @@ pub struct Game {
   pub commission_rate: u128,
   pub status: Status,
   pub values: Vec<u128>,
-  pub numbers: Vec<u128>,
+  pub numbers: Vec<u32>,
+  pub outcome: Vec<u32>,
 }
 #[contracttype]
 #[derive(Clone, Debug)]

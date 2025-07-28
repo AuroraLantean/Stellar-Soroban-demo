@@ -152,6 +152,8 @@ impl Prediction {
 
     let key = Registry::Games(game_id);
     let game_opt: Option<Game> = env.storage().persistent().get(&key);
+    let empty_vec: Vec<u128> = vec![&env, 0, 0, 0, 0];
+    let empty_vec32: Vec<u32> = vec![&env, 0, 0, 0, 0];
     let game = if let Some(mut prev) = game_opt {
       if prev.game_admin != game_admin {
         return Err(Error::GameAdminUnauthorized);
@@ -165,8 +167,9 @@ impl Prediction {
       prev.time_start = time_start;
       prev.time_end = time_end;
       prev.status = Status::Active;
-      prev.values = vec![&env, 0, 0, 0, 0];
-      prev.numbers = vec![&env, 0, 0, 0, 0];
+      prev.values = empty_vec.clone();
+      prev.numbers = empty_vec32.clone();
+      prev.outcome = empty_vec32.clone();
       prev
     } else {
       if time > time_end {
@@ -178,8 +181,9 @@ impl Prediction {
         time_end,
         commission_rate,
         status: Status::Active,
-        values: vec![&env, 0, 0, 0, 0],
-        numbers: vec![&env, 0, 0, 0, 0],
+        values: empty_vec.clone(),
+        numbers: empty_vec32.clone(),
+        outcome: empty_vec32.clone(),
       }
     };
     env.storage().persistent().set(&key, &game);
@@ -309,7 +313,13 @@ impl Prediction {
     bet_opt
   }
 
-  pub fn settle(env: Env, admin: Address, game_id: u32, vault: Address) -> Result<u32, Error> {
+  pub fn settle(
+    env: Env,
+    admin: Address,
+    game_id: u32,
+    outcome: Vec<u32>,
+    vault: Address,
+  ) -> Result<u32, Error> {
     log!(&env, "settle");
     admin.require_auth();
     let time = env.ledger().timestamp();
@@ -344,8 +354,7 @@ impl Prediction {
     let commission_fee = numerator.div_ceil(1000); //rounding up here may balance users' rounding down
     log!(&env, "commission_fee: {}", commission_fee);
 
-    game.values = vec![&env, 0, 0, 0, 0];
-    game.numbers = vec![&env, 0, 0, 0, 0];
+    game.outcome = outcome;
     env.storage().persistent().set(&key, &game);
     env
       .storage()
