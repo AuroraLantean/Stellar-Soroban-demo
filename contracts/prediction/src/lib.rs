@@ -4,10 +4,9 @@ use soroban_sdk::{
   contract, contractimpl, log, symbol_short, token, vec, Address, Env, String, Symbol, Vec,
 };
 
-use crate::types::{Bet, Error, Game, Registry, State, Status, User, MAX_COUNT, STATE};
+use crate::types::{Bet, Error, Game, Registry, State, Status, User, GAME, MAX_COUNT, STATE, USER};
 mod types;
 
-//TODO: simpleAccount
 #[contract]
 pub struct Prediction;
 
@@ -123,6 +122,7 @@ impl Prediction {
     };
     //log!(&env, "user:{:?}", user);
     env.storage().persistent().set(&key, &user);
+    env.events().publish((USER, symbol_short!("add")), addr);
     Ok(0u32)
   }
   pub fn delete_user(env: Env, addr: Address) -> Result<u32, Error> {
@@ -131,6 +131,7 @@ impl Prediction {
       return Err(Error::UserBalanceExists);
     }
     env.storage().persistent().remove(&user);
+    env.events().publish((USER, symbol_short!("delete")), addr);
     Ok(0u32)
   }
 
@@ -142,7 +143,7 @@ impl Prediction {
     time_end: u64,
     commission_rate: u128, //0.1% as 1
   ) -> Result<u32, Error> {
-    log!(&env, "setup_game");
+    log!(&env, "set_game");
     game_admin.require_auth();
     if time_end <= time_start {
       return Err(Error::EndTimeTooSmall);
@@ -176,7 +177,7 @@ impl Prediction {
         return Err(Error::AfterEndTime);
       }
       Game {
-        game_admin,
+        game_admin: game_admin.clone(),
         time_start,
         time_end,
         commission_rate,
@@ -193,6 +194,9 @@ impl Prediction {
       .storage()
       .persistent()
       .extend_ttl(&key, 50, env.storage().max_ttl());
+    env
+      .events()
+      .publish((GAME, symbol_short!("set_game")), game_admin);
     Ok(0u32)
   }
   pub fn get_game(env: Env, game_id: u32) -> Option<Game> {
@@ -304,6 +308,7 @@ impl Prediction {
       .storage()
       .persistent()
       .extend_ttl(&key, 50, env.storage().max_ttl());
+    env.events().publish((GAME, symbol_short!("bet")), amount);
     //transfer token
     token.transfer_from(&ctrt_addr, &user, &ctrt_addr, &amount);
     Ok(0u32)
@@ -386,7 +391,7 @@ impl Prediction {
     if balc < fee {
       return Err(Error::InsufficientBalance);
     }
-
+    env.events().publish((GAME, symbol_short!("settle")), fee);
     token.transfer(&ctrt_addr, &vault, &fee);
     Ok(0u32)
   }
@@ -473,6 +478,9 @@ impl Prediction {
       .storage()
       .persistent()
       .extend_ttl(&key, 50, env.storage().max_ttl());
+    env
+      .events()
+      .publish((GAME, symbol_short!("claim")), claim_amt);
     //transfer token
     token.transfer(&ctrt_addr, &user, &claim_amt.cast_signed());
     Ok(0u32)
@@ -510,7 +518,7 @@ impl Prediction {
       .extend_ttl(&STATE, 50, env.storage().max_ttl());
     env
       .events()
-      .publish((STATE, symbol_short!("reset_adm")), admin_new);
+      .publish((STATE, symbol_short!("reset")), admin_new);
     Ok(0u32)
   }
 

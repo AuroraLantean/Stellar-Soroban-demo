@@ -52,6 +52,7 @@ pub enum Registry {
   Bets(Address, u32), //user, game_id
 }
 //if env.storage().instance().has(&DataKey::Owner) {  panic!("owner is already set"); }
+pub const USER: Symbol = symbol_short!("USER");
 #[contracttype]
 #[derive(Clone, Debug)]
 pub struct User {
@@ -61,6 +62,7 @@ pub struct User {
   pub updated_at: u64,
 }
 //----------== Prediction
+pub const GAME: Symbol = symbol_short!("GAME");
 #[contracttype]
 #[derive(Clone, Debug)]
 pub struct Game {

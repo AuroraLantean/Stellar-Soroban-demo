@@ -245,7 +245,7 @@ fn test_state() {
       &env,
       (
         ctrt_addr.clone(),
-        (symbol_short!("STATE"), symbol_short!("reset_adm")).into_val(&env),
+        (symbol_short!("STATE"), symbol_short!("reset")).into_val(&env),
         user1.into_val(&env)
       ),
     ]
@@ -268,7 +268,7 @@ fn testf_max_count() {
   //ll!("{}", env.logs().all().join("\n"));
 }
 #[test]
-#[should_panic(expected = "HostError: Error(Contract, #43)")] //depending on Error enum index
+#[should_panic(expected = "HostError: Error(Contract, #99)")] //depending on Error enum index
 fn testf_max_count2() {
   let env = Env::default();
   let (ctrt, _, _, _, _, _, _, _, _) = setup(&env);
