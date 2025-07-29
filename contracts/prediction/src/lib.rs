@@ -489,9 +489,6 @@ impl Prediction {
         .storage()
         .persistent()
         .extend_ttl(&STATE, 50, env.storage().max_ttl());
-      env
-        .events()
-        .publish((STATE, symbol_short!("increment")), state.count);
       Ok(state.count)
     } else {
       log!(&env, "failure here!");
@@ -500,19 +497,23 @@ impl Prediction {
     }
   }
 
-  pub fn reset_count(env: Env, value: u32) -> Result<u32, Error> {
+  pub fn reset_admin(env: Env, admin: Address, admin_new: Address) -> Result<u32, Error> {
+    log!(&env, "set_admin");
+    admin.require_auth();
     let mut state = Self::get_state(env.clone())?;
-    log!(&env, "reset_count: {}", state);
-
-    state.count = value;
-    state.last_incr = value;
+    log!(&env, "state: {}", state);
+    state.admin = admin_new.clone();
     env.storage().persistent().set(&STATE, &state);
     env
       .storage()
       .persistent()
       .extend_ttl(&STATE, 50, env.storage().max_ttl());
-    Ok(state.count)
+    env
+      .events()
+      .publish((STATE, symbol_short!("reset_adm")), admin_new);
+    Ok(0u32)
   }
+
   pub fn get_state(env: Env) -> Result<State, Error> {
     let state_opt = env.storage().persistent().get(&STATE);
     if state_opt.is_none() {

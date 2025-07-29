@@ -230,35 +230,29 @@ fn test_game() {
 #[test]
 fn test_state() {
   let env = Env::default();
-  let (ctrt, ctrt_addr, _, _, _, _, _, _, _) = setup(&env);
+  let (ctrt, ctrt_addr, _token, _token_id, admin, user1, _, _, _) = setup(&env);
 
   let state = ctrt.get_state();
-  ll!("state: {:?}", state);
+  llc("state:", state.clone());
   assert_eq!(state.count, 0);
-
   assert_eq!(ctrt.increment(&3), 3);
+
+  //admin to reset_admin
+  ctrt.reset_admin(&admin, &user1);
   assert_eq!(
     env.events().all(),
     vec![
       &env,
       (
         ctrt_addr.clone(),
-        (symbol_short!("STATE"), symbol_short!("increment")).into_val(&env),
-        3u32.into_val(&env)
+        (symbol_short!("STATE"), symbol_short!("reset_adm")).into_val(&env),
+        user1.into_val(&env)
       ),
     ]
   );
-  assert_eq!(ctrt.increment(&2), 5);
   let state = ctrt.get_state();
-  assert_eq!(state.count, 5);
-
-  assert_eq!(ctrt.reset_count(&99), 99);
-  let state = ctrt.get_state();
-  ll!("state.count: {:?}", state.count);
-  //log!(&env, "state.count: {:?}", state.count);
-  assert_eq!(state.count, 99);
-
-  //assert_eq!(ctrt.increment(&1), Error::LimitReached);
+  llc("state:", state.clone());
+  assert_eq!(state.admin, user1);
 }
 
 #[test]

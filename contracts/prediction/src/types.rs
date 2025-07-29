@@ -34,7 +34,7 @@ pub enum Error {
 pub const MAX_COUNT: u32 = 5;
 //----------== Bank
 pub const STATE: Symbol = symbol_short!("STATE");
-#[contracttype]
+#[contracttype] //no Copy
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct State {
   pub count: u32,
