@@ -52,7 +52,7 @@ impl Prediction {
     log!(&env, "about to get_user");
     let mut user = Self::get_user(env.clone(), sender.clone())?;
 
-    user.balance += amount;
+    user.balance = user.balance.checked_add(amount).expect("add");
     user.updated_at = env.ledger().timestamp();
     //log!(&env, "user:{:?}", user);
     let key = Registry::Users(sender.clone());
@@ -85,7 +85,7 @@ impl Prediction {
     log!(&env, "about to get_user");
     let mut user = Self::get_user(env.clone(), sender.clone())?;
 
-    user.balance -= amount;
+    user.balance = user.balance.checked_sub(amount).expect("sub");
     user.updated_at = env.ledger().timestamp();
     //log!(&env, "user:{:?}", user);
     let key = Registry::Users(sender.clone());
@@ -180,6 +180,8 @@ impl Prediction {
         time_start,
         time_end,
         commission_rate,
+        users_profit: 0,
+        total_wins: 0,
         status: Status::Active,
         values: empty_vec.clone(),
         numbers: empty_vec32.clone(),
@@ -249,7 +251,7 @@ impl Prediction {
     }
     if time < game.time_start {
       return Err(Error::BeforeStartTime);
-    } //TODO: test on time travel
+    }
     if time >= game.time_end {
       return Err(Error::AfterEndTime);
     }
@@ -271,7 +273,7 @@ impl Prediction {
 
     env.storage().persistent().set(&key, &game);
 
-    // get_bat
+    // get_bet
     log!(&env, "get bet");
     if bet_index > 3 {
       return Err(Error::BetIndexInvalid);
@@ -342,6 +344,7 @@ impl Prediction {
       return Err(Error::GameStatusInvalid);
     }
     game.status = Status::Settled;
+    game.outcome = outcome.clone();
     //game.time_start = 0;
     //game.time_end = 0;
 
@@ -353,8 +356,18 @@ impl Prediction {
       .expect("numerator"); //reduce commision rate when this error happens
     let commission_fee = numerator.div_ceil(1000); //rounding up here may balance users' rounding down
     log!(&env, "commission_fee: {}", commission_fee);
+    game.users_profit = game_value_sum.checked_sub(commission_fee).expect("sub");
 
-    game.outcome = outcome;
+    let mut total_wins = 0u128;
+    for (iu, v) in game.outcome.clone().into_iter().enumerate() {
+      let idx: u32 = iu.try_into().expect("index to u32");
+      if v > 0 {
+        let value = game.values.get(idx).expect("game value is none");
+        total_wins = total_wins.checked_add(value).expect("add");
+      }
+    }
+    game.total_wins = total_wins;
+
     env.storage().persistent().set(&key, &game);
     env
       .storage()
@@ -373,21 +386,102 @@ impl Prediction {
     if balc < fee {
       return Err(Error::InsufficientBalance);
     }
+
     token.transfer(&ctrt_addr, &vault, &fee);
     Ok(0u32)
   }
-  /*pub struct Game {
-    pub game_admin: Address,
-    pub time_start: u64,
-    pub time_end: u64,
-    pub status: Status,
-    pub values: Vec<u128>,
-    pub numbers: Vec<u128>,
-  } */
+  /*Rules:
+  game commission_fee = (sum of game.values) * commission
+  game users_profit = sum of game.values - commission_fee
+  game total_wins = sum of winning choices
+  user claim amount = users_profit * sum of user's winning bet amounts / total_wins
+  */
+  pub fn claim(env: Env, user: Address, game_id: u32) -> Result<u32, Error> {
+    log!(&env, "claim");
+    user.require_auth();
+    let ctrt_addr = env.current_contract_address();
+
+    //check state
+    let state = Self::get_state(env.clone())?;
+    log!(&env, "state: {}", state);
+    if state.status != Status::Active {
+      return Err(Error::StateStatusInvalid);
+    };
+
+    let token = token::Client::new(&env, &state.token);
+    let sender_balance = token.balance(&user);
+    let amount = 100;
+    if sender_balance < amount {
+      return Err(Error::InsufficientBalance);
+    }
+    let allowance = token.allowance(&user, &ctrt_addr);
+    if allowance < amount {
+      return Err(Error::InsufficientAllowance);
+    }
+
+    //check time
+    let time = env.ledger().timestamp();
+    log!(&env, "time: {}", time);
+
+    //check game
+    let key = Registry::Games(game_id);
+    let game_opt: Option<Game> = env.storage().persistent().get(&key);
+    if game_opt.is_none() {
+      return Err(Error::GameDoesNotExist);
+    }
+    let game = game_opt.unwrap();
+    if time < game.time_end {
+      return Err(Error::AfterEndTime);
+    }
+    if game.status != Status::Settled {
+      return Err(Error::GameStatusInvalid);
+    }
+
+    // get_bet
+    let key = Registry::Bets(user.clone(), game_id);
+    let bet_opt: Option<Bet> = env.storage().persistent().get(&key);
+    if bet_opt.is_none() {
+      return Err(Error::BetDoesNotExist);
+    }
+    let mut bet = bet_opt.unwrap();
+    if bet.claimed {
+      return Err(Error::BetClaimedAlready);
+    }
+    log!(&env, "bet:{:?}", bet);
+    let bet_values = bet.bet_values.clone();
+
+    let mut user_win = 0u128;
+    for (iu, v) in game.outcome.into_iter().enumerate() {
+      let idx: u32 = iu.try_into().expect("index to u32");
+      if v > 0 {
+        let bet_amt = bet_values.get(idx).expect("bet_value is none");
+        user_win = user_win.checked_add(bet_amt).expect("add");
+      }
+    }
+    log!(&env, "user_win:{:?}", user_win);
+
+    let numerator = game.users_profit.checked_mul(user_win).expect("numerator");
+
+    let claim_amt = numerator.checked_div(game.total_wins).expect("div"); //quotient to floor
+    if claim_amt == 0 {
+      return Err(Error::UserClaimsZero);
+    }
+    //save bet
+    bet.claimed = true;
+    env.storage().persistent().set(&key, &bet);
+    env
+      .storage()
+      .persistent()
+      .extend_ttl(&key, 50, env.storage().max_ttl());
+    //transfer token
+    token.transfer(&ctrt_addr, &user, &claim_amt.cast_signed());
+    Ok(0u32)
+  }
+
   pub fn increment(env: Env, incr: u32) -> Result<u32, Error> {
     let mut state = Self::get_state(env.clone())?;
     log!(&env, "increment: {}", state);
-    state.count += incr;
+    state.count = state.count.checked_add(incr).expect("add");
     state.last_incr = incr;
     if state.count <= MAX_COUNT {
       env.storage().persistent().set(&STATE, &state);

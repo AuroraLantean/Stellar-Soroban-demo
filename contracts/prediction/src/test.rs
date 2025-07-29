@@ -62,8 +62,10 @@ fn setup(
   asset.mint(&admin, &INITBALC);
   asset.mint(&user1, &INITBALC);
   asset.mint(&user2, &INITBALC);
+  asset.mint(&user3, &INITBALC);
   token.approve(&user1, &ctrt_addr, &INITBALC, &100);
   token.approve(&user2, &ctrt_addr, &INITBALC, &100);
+  token.approve(&user3, &ctrt_addr, &INITBALC, &100);
   (
     ctrt, ctrt_addr, token, token_id, admin, user1, user2, user3, vault,
   )
@@ -71,7 +73,7 @@ fn setup(
 #[test]
 fn test_init_conditions() {
   let env = Env::default();
-  let (ctrt, ctrt_addr, token, token_id, admin, user1, user2, _, _) = setup(&env);
+  let (ctrt, ctrt_addr, token, token_id, admin, user1, user2, user3, _) = setup(&env);
 
   let state = ctrt.get_state();
   ll!("state: {:?}", state);
@@ -82,8 +84,10 @@ fn test_init_conditions() {
   assert_eq!(state.status, Status::Active);
   assert_eq!(token.balance(&user1), INITBALC);
   assert_eq!(token.balance(&user2), INITBALC);
+  assert_eq!(token.balance(&user3), INITBALC);
   assert_eq!(token.allowance(&user1, &ctrt_addr), INITBALC);
   assert_eq!(token.allowance(&user2, &ctrt_addr), INITBALC);
+  assert_eq!(token.allowance(&user3, &ctrt_addr), INITBALC);
   assert_eq!(token.balance(&ctrt_addr), 0);
 
   token.transfer(&user1, &user2, &137);
@@ -122,7 +126,7 @@ fn test_token() {
 #[test]
 fn test_game() {
   let env = Env::default();
-  let (ctrt, ctrt_addr, token, _token_id, admin, user1, user2, _, vault) = setup(&env);
+  let (ctrt, ctrt_addr, token, _token_id, admin, user1, user2, user3, vault) = setup(&env);
   let game_id = 1u32;
   let time_start = 0u64;
   let time_end = 100u64;
@@ -169,7 +173,7 @@ fn test_game() {
   llc("ctrt balc:", balc1.clone());
   assert_eq!(balc1.cast_unsigned(), value1);
 
-  //user2 bets
+  //user2 bets on losing
   let bet_idx2 = 3u32;
   let value2 = 237u128;
   llc("user2 to bet", value2);
@@ -177,13 +181,21 @@ fn test_game() {
   let bet = ctrt.get_bet(&user2, &game_id);
   llc("user2's bet", bet.clone());
 
-  //user1 bets again
+  //user1 bets again on winning
   let bet_idx1 = 0u32;
   let value1 = 248u128;
   llc("user1 to bet", value1);
   ctrt.bet(&user1, &game_id, &value1, &bet_idx1);
   let bet = ctrt.get_bet(&user1, &game_id);
   llc("user1's bet", bet.clone());
+
+  //user3 bets on winning
+  let bet_idx3 = 0u32;
+  let value3 = 569u128;
+  llc("user3 to bet", value3);
+  ctrt.bet(&user3, &game_id, &value3, &bet_idx3);
+  let bet = ctrt.get_bet(&user3, &game_id);
+  llc("user3's bet", bet.clone());
 
   //time travel to the end time
   env.ledger().set_timestamp(100);
@@ -200,6 +212,20 @@ fn test_game() {
 
   let balc = token.balance(&vault);
   llc("vault balc Af:", balc.clone());
+
+  let balc1bf = token.balance(&user1);
+  llc("user1 balc B4:", balc1bf.clone());
+  //user1 to claim
+  ctrt.claim(&user1, &game_id);
+  let balc1af = token.balance(&user1);
+  llc("user1 balc Af:", balc1af.clone());
+  llc("user1 balc change:", balc1af - balc1bf);
+
+  //user2 to claim
+  assert_eq!(
+    ctrt.try_claim(&user2, &game_id),
+    Err(Ok(Error::UserClaimsZero))
+  );
 }
 #[test]
 fn test_state() {
